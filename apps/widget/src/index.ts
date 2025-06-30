@@ -21,7 +21,7 @@ class RiddleMeThisWidget {
     container.innerHTML = `
       <div style="border: 1px solid #ccc; padding: 20px; border-radius: 8px;">
         <h3>RiddleMeThis Widget</h3>
-        <input type="text" placeholder="Ask me anything..." style="width: 100%; padding: 8px; margin: 8px 0;">
+        <input type="text" placeholder="Riddle me this..." style="width: 100%; padding: 8px; margin: 8px 0;">
         <button style="padding: 8px 16px;">Ask</button>
         <div id="riddle-response" style="margin-top: 16px;"></div>
       </div>
