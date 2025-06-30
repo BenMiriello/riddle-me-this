@@ -1,0 +1,15 @@
+{
+  "name": "@riddle-me-this/api",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "echo 'API builds during deployment with wrangler deploy'",
+    "deploy": "wrangler deploy --minify",
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings"
+  },
+  "dependencies": {
+    "hono": "^4.8.3"
+  },
+  "devDependencies": {
+    "wrangler": "^4.4.0"
+  }
+}
