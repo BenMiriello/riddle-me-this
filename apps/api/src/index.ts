@@ -2,7 +2,14 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 
 interface Env {
-  AI: unknown
+  AI: {
+    run: (
+      model: string,
+      options: {
+        messages: Array<{ role: string; content: string }>
+      }
+    ) => Promise<{ response: string }>
+  }
   GOOGLE_SEARCH_API_KEY?: string
   GOOGLE_SEARCH_ENGINE_ID?: string
 }
@@ -39,7 +46,6 @@ app.post('/riddle', async (c) => {
     // Note: we want to add more granularity to the structure later (not yet),
     // such as 'iambic pentameter' (bard badge) or 'haiku' or other
 
-    // Guidelines for writing concise riddles
     const howToWriteARiddle = `
     Write a SHORT riddle (2-4 lines maximum) that:
     1. MUST clearly hint at the specific answer provided
@@ -87,7 +93,6 @@ Respond with only one word: SEARCH or KNOWLEDGE`,
       .toUpperCase()
       .includes('SEARCH')
 
-    // Debug: Check environment variables
     console.log('Environment check:')
     console.log('needsSearch:', needsSearch)
     console.log('Has API key:', !!c.env.GOOGLE_SEARCH_API_KEY)
@@ -99,19 +104,18 @@ Respond with only one word: SEARCH or KNOWLEDGE`,
     let searchResults: Array<{ title: string; snippet: string; link: string }> =
       []
     if (needsSearch && c.env.GOOGLE_SEARCH_API_KEY) {
-      // Perform web search
       try {
         const searchQuery = encodeURIComponent(question)
         const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${c.env.GOOGLE_SEARCH_API_KEY}&cx=${c.env.GOOGLE_SEARCH_ENGINE_ID}&q=${searchQuery}&num=3`
 
         const searchResponse = await fetch(searchUrl)
-        const searchData = await searchResponse.json()
+        const searchData = (await searchResponse.json()) as {
+          items?: Array<{ title: string; snippet: string; link: string }>
+        }
 
-        // Debug: Log what we got back
         console.log('Search response status:', searchResponse.status)
         console.log('Search data:', JSON.stringify(searchData, null, 2))
 
-        // Extract search results
         searchResults =
           searchData.items
             ?.slice(0, 3)
@@ -123,21 +127,20 @@ Respond with only one word: SEARCH or KNOWLEDGE`,
 
         console.log('Processed search results:', searchResults)
 
-        // Generate answer using search results
-        const searchContext = searchResults
-          .map((r) => `${r.title}: ${r.snippet}`)
-          .join('\n\n')
+        // Generate answer using primary source (first result)
+        const primarySource = searchResults[0]
+        const searchContext = `${primarySource.title}: ${primarySource.snippet}`
 
         answerResponse = await c.env.AI.run('@cf/meta/llama-3-8b-instruct', {
           messages: [
             {
               role: 'system',
               content:
-                'Using the search results provided, answer the question directly and concisely. Focus on the most relevant information. Be brief.',
+                'Using this specific source, answer the question directly and concisely. Focus on the information from this source. Be brief.',
             },
             {
               role: 'user',
-              content: `Question: ${question}\n\nSearch Results:\n${searchContext}\n\nAnswer:`,
+              content: `Question: ${question}\n\nSource: ${searchContext}\n\nAnswer:`,
             },
           ],
         })
@@ -224,12 +227,10 @@ Return ONLY the riddle, nothing else. Maximum 4 lines.`,
       riddleResponse = riddleResult.response
     }
 
-    // Return appropriate response
     const finalResponse = inputWasRiddle
       ? answerResponse.response
       : riddleResponse
 
-    // Debug: Log what we're returning
     console.log('Final searchResults being returned:', searchResults)
 
     return c.json({
@@ -240,6 +241,7 @@ Return ONLY the riddle, nothing else. Maximum 4 lines.`,
       needsSearch: needsSearch,
       searchQuery: needsSearch ? question : null,
       searchResults: searchResults,
+      primarySource: searchResults[0] || null,
       searchPerformed: needsSearch && !!c.env.GOOGLE_SEARCH_API_KEY,
       evaluation: evaluationResponse.response,
     })

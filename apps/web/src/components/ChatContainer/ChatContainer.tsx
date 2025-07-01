@@ -1,11 +1,17 @@
-import { useState, useEffect } from 'react'
-import ChatInput from './ChatInput/ChatInput'
-import InteractiveLogo from './InteractiveLogo/InteractiveLogo'
+import { useState } from 'react'
+import ChatInput from './ChatInput'
+import InteractiveLogo from './InteractiveLogo'
+import ChatResponse from './ChatResponse/ChatResponse'
+import { printResponse } from '../../utils'
 
 const ChatContainer = () => {
   const [response, setResponse] = useState('')
   const [isTyping, setIsTyping] = useState(false)
-  const [loadingDots, setLoadingDots] = useState('.')
+  const [primarySource, setPrimarySource] = useState<{
+    title: string
+    snippet: string
+    link: string
+  } | null>(null)
 
   const typeResponse = (text: string) => {
     setResponse('')
@@ -20,28 +26,13 @@ const ChatContainer = () => {
         clearInterval(timer)
         setIsTyping(false)
       }
-    }, 30) // Type speed - 30ms per character
+    }, 15)
   }
 
-  // Loading dots animation
-  useEffect(() => {
-    let interval: NodeJS.Timeout
-    if (isTyping && response === '') {
-      interval = setInterval(() => {
-        setLoadingDots((prev) => {
-          if (prev === '.') return '..'
-          if (prev === '..') return '...'
-          return '.'
-        })
-      }, 500)
-    }
-    return () => clearInterval(interval)
-  }, [isTyping, response])
-
   const handleSubmit = async (question: string) => {
-    setResponse('') // Clear previous response immediately
+    setResponse('')
+    setPrimarySource(null)
     setIsTyping(true)
-    setLoadingDots('.')
 
     try {
       const response = await fetch(
@@ -57,20 +48,11 @@ const ChatContainer = () => {
 
       const data = await response.json()
 
-      // Console log for debugging
-      console.log('=== API RESPONSE ===')
-      console.log('Full response:', data)
-      console.log('Answer:', data.answer)
-      console.log('Riddle:', data.riddle)
-      console.log('Response:', data.response)
-      console.log('Input was riddle:', data.inputWasRiddle)
-      console.log('Needs search:', data.needsSearch)
-      console.log('Search performed:', data.searchPerformed)
-      console.log('Search query:', data.searchQuery)
-      console.log('Search results:', data.searchResults)
-      console.log('Search results length:', data.searchResults?.length)
-      console.log('Evaluation:', data.evaluation)
-      console.log('=== END RESPONSE ===')
+      printResponse(data)
+
+      if (data.primarySource && data.searchPerformed) {
+        setPrimarySource(data.primarySource)
+      }
 
       if (data.response) {
         typeResponse(data.response)
@@ -83,22 +65,23 @@ const ChatContainer = () => {
       }
     } catch (error) {
       console.error('Error:', error)
-      typeResponse('The riddle spirits are silent today...')
+      typeResponse('Riddle me not. An error occured getting your response...')
     }
   }
 
   return (
     <div className="flex flex-col min-h-screen bg-gray-800 text-white">
-      {/* Q&A interface - centered on page */}
       <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md px-4">
         <InteractiveLogo />
         <ChatInput onSubmit={handleSubmit} isLoading={isTyping} />
 
-        {/* Response appears below input */}
         {(response || isTyping) && (
-          <div className="mt-4 text-white text-sm">
-            {response || loadingDots}
-            {isTyping && response && <span className="animate-pulse">|</span>}
+          <div className="mt-4">
+            <ChatResponse
+              response={response}
+              isTyping={isTyping}
+              primarySource={primarySource}
+            />
           </div>
         )}
       </div>
