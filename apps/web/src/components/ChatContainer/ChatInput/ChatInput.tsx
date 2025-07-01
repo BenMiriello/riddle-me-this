@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 interface ChatInputProps {
-  onSubmit: () => void
+  onSubmit: (question: string) => void
   isLoading: boolean
 }
 
@@ -11,8 +11,8 @@ const ChatInput = ({ onSubmit, isLoading }: ChatInputProps) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (inputValue.trim() && !isLoading) {
-      onSubmit()
-      setInputValue('')
+      onSubmit(inputValue.trim())
+      // Don't clear input - leave question there
     }
   }
 

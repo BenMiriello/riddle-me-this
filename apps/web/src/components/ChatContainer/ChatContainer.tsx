@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ChatInput from './ChatInput/ChatInput'
 import InteractiveLogo from './InteractiveLogo/InteractiveLogo'
 
 const ChatContainer = () => {
   const [response, setResponse] = useState('')
   const [isTyping, setIsTyping] = useState(false)
+  const [loadingDots, setLoadingDots] = useState('.')
 
   const typeResponse = (text: string) => {
     setResponse('')
@@ -22,11 +23,68 @@ const ChatContainer = () => {
     }, 30) // Type speed - 30ms per character
   }
 
-  const handleSubmit = () => {
-    // Start typing response after brief delay
-    setTimeout(() => {
-      typeResponse("I don't know about that")
-    }, 500)
+  // Loading dots animation
+  useEffect(() => {
+    let interval: NodeJS.Timeout
+    if (isTyping && response === '') {
+      interval = setInterval(() => {
+        setLoadingDots((prev) => {
+          if (prev === '.') return '..'
+          if (prev === '..') return '...'
+          return '.'
+        })
+      }, 500)
+    }
+    return () => clearInterval(interval)
+  }, [isTyping, response])
+
+  const handleSubmit = async (question: string) => {
+    setResponse('') // Clear previous response immediately
+    setIsTyping(true)
+    setLoadingDots('.')
+
+    try {
+      const response = await fetch(
+        'https://riddle-30e2.benmiriello.workers.dev/riddle',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ question }),
+        }
+      )
+
+      const data = await response.json()
+
+      // Console log for debugging
+      console.log('=== API RESPONSE ===')
+      console.log('Full response:', data)
+      console.log('Answer:', data.answer)
+      console.log('Riddle:', data.riddle)
+      console.log('Response:', data.response)
+      console.log('Input was riddle:', data.inputWasRiddle)
+      console.log('Needs search:', data.needsSearch)
+      console.log('Search performed:', data.searchPerformed)
+      console.log('Search query:', data.searchQuery)
+      console.log('Search results:', data.searchResults)
+      console.log('Search results length:', data.searchResults?.length)
+      console.log('Evaluation:', data.evaluation)
+      console.log('=== END RESPONSE ===')
+
+      if (data.response) {
+        typeResponse(data.response)
+      } else if (data.riddle && data.riddle !== data.answer) {
+        typeResponse(data.riddle)
+      } else if (data.answer) {
+        typeResponse(data.answer)
+      } else {
+        typeResponse('The riddle escaped me this time...')
+      }
+    } catch (error) {
+      console.error('Error:', error)
+      typeResponse('The riddle spirits are silent today...')
+    }
   }
 
   return (
@@ -37,10 +95,10 @@ const ChatContainer = () => {
         <ChatInput onSubmit={handleSubmit} isLoading={isTyping} />
 
         {/* Response appears below input */}
-        {response && (
+        {(response || isTyping) && (
           <div className="mt-4 text-white text-sm">
-            {response}
-            {isTyping && <span className="animate-pulse">|</span>}
+            {response || loadingDots}
+            {isTyping && response && <span className="animate-pulse">|</span>}
           </div>
         )}
       </div>
