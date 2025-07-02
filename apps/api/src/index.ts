@@ -1,5 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
+import packageJson from '../package.json'
 
 interface Env {
   AI: {
@@ -12,6 +13,7 @@ interface Env {
   }
   GOOGLE_SEARCH_API_KEY?: string
   GOOGLE_SEARCH_ENGINE_ID?: string
+  ENVIRONMENT?: string
 }
 
 const app = new Hono<{ Bindings: Env }>()
@@ -20,6 +22,15 @@ app.use('*', cors())
 
 app.get('/', (c) => {
   return c.text('RiddleMeThis API')
+})
+
+app.get('/health', (c) => {
+  return c.json({
+    status: 'healthy',
+    version: packageJson.version,
+    buildTime: new Date().toISOString(),
+    environment: c.env.ENVIRONMENT || 'production',
+  })
 })
 
 app.post('/riddle', async (c) => {

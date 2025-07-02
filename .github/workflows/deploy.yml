@@ -5,6 +5,17 @@ on:
     branches: [production]
   pull_request:
     branches: [production]
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type'
+        required: true
+        default: 'patch'
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
 
 jobs:
   test:
@@ -69,6 +80,8 @@ jobs:
     if: github.ref == 'refs/heads/production'
     steps:
       - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -79,9 +92,46 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Smart version increment
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # Get current version and last commit message
+          CURRENT_VERSION=$(node -p "require('./apps/api/package.json').version")
+          LAST_COMMIT_MSG=$(git log -1 --pretty=%B)
+
+          # Check if version was already bumped in this commit
+          if [[ "$LAST_COMMIT_MSG" == *"$CURRENT_VERSION"* ]]; then
+            echo "Version already bumped to $CURRENT_VERSION - skipping auto-increment"
+          else
+            echo "Auto-incrementing version"
+            BUMP_TYPE="${{ github.event.inputs.version_bump || 'patch' }}"
+            npm version $BUMP_TYPE --workspaces --no-git-tag-version
+            git add apps/*/package.json
+            NEW_VERSION=$(node -p "require('./apps/api/package.json').version")
+            git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+            git push origin production
+          fi
+
       - name: Deploy API to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: apps/api
-          command: deploy --minify
+          command: deploy --env production --minify
+
+      - name: Send failure notification
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 587
+          username: ${{ secrets.EMAIL_USERNAME }}
+          password: ${{ secrets.EMAIL_PASSWORD }}
+          to: benmiriello@gmail.com
+          from: RiddleMeThis Deploy <${{ secrets.EMAIL_USERNAME }}>
+          subject: '🚨 Deploy Failed: RiddleMeThis'
+          body: |
+            Deploy failed for commit: ${{ github.sha }}
+            View logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
