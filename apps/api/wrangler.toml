@@ -8,7 +8,10 @@ binding = "AI"
 # Development environment (remote dev worker for testing)
 [env.development]
 name = "riddle-me-this-api-dev"
-vars = { ENVIRONMENT = "development" }
+vars = {
+    ENVIRONMENT = "development",
+    GOOGLE_SEARCH_ENGINE_ID = "a61de03c6209d4c31"
+}
 
 [env.development.ai]
 binding = "AI"
@@ -16,13 +19,18 @@ binding = "AI"
 # Production environment
 [env.production]
 name = "riddle-me-this-api"
-vars = { ENVIRONMENT = "production" }
+vars = {
+    ENVIRONMENT = "production",
+    GOOGLE_SEARCH_ENGINE_ID = "a61de03c6209d4c31"
+}
 
 [env.production.ai]
 binding = "AI"
+
+[observability.logs]
+enabled = true
 
 # Future configurations can be added here:
 # [kv_namespaces]
 # [r2_buckets]
 # [d1_databases]
-# [observability]
