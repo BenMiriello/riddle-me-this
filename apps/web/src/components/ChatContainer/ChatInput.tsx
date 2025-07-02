@@ -80,7 +80,7 @@ const ChatInput = ({ onSubmit, isLoading }: ChatInputProps) => {
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={forceBlur}
-          placeholder="Riddle me this..."
+          placeholder="Riddle this for me..."
           rows={1}
           className="flex-1 bg-gray-600 text-white text-sm border border-gray-500 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 resize-none focus:text-base md:focus:text-sm"
           disabled={isLoading}

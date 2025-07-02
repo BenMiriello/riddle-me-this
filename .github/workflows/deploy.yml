@@ -120,18 +120,3 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: apps/api
           command: deploy --env production --minify
-
-      - name: Send failure notification
-        if: failure()
-        uses: dawidd6/action-send-mail@v3
-        with:
-          server_address: smtp.gmail.com
-          server_port: 587
-          username: ${{ secrets.EMAIL_USERNAME }}
-          password: ${{ secrets.EMAIL_PASSWORD }}
-          to: benmiriello@gmail.com
-          from: RiddleMeThis Deploy <${{ secrets.EMAIL_USERNAME }}>
-          subject: '🚨 Deploy Failed: RiddleMeThis'
-          body: |
-            Deploy failed for commit: ${{ github.sha }}
-            View logs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
