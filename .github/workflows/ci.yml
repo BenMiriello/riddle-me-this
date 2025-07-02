@@ -120,3 +120,10 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: apps/api
           command: deploy --env production --minify
+
+      - name: Sync version back to main
+        run: |
+          git fetch origin main
+          git checkout main
+          git merge production --no-edit
+          git push origin main
