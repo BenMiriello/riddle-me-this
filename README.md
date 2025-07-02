@@ -2,6 +2,8 @@
 
 ## CI/CD Pipeline
 
+<!-- Note: Testing deploying through Cloudflare wich may invalidate the github actions system here -->
+
 The project uses GitHub Actions for continuous integration and deployment.
 
 - **api**: `.github/workflows/ci.yml` will trigger deploy to Cloudflare production workers on push to `production` branch of the api.
