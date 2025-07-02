@@ -97,32 +97,47 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
-          # Get current version and last commit message
-          CURRENT_VERSION=$(node -p "require('./apps/api/package.json').version")
+          # Get current version and check if already bumped
+          CURRENT_VERSION=$(node -p "require('./apps/api/package.json').version" 2>/dev/null || echo "unknown")
           LAST_COMMIT_MSG=$(git log -1 --pretty=%B)
 
-          # Check if version was already bumped in this commit
-          if [[ "$LAST_COMMIT_MSG" == *"$CURRENT_VERSION"* ]]; then
+          # More precise check: only skip if commit message starts with version bump pattern
+          if [[ "$LAST_COMMIT_MSG" =~ ^"chore: bump version to $CURRENT_VERSION" ]]; then
             echo "Version already bumped to $CURRENT_VERSION - skipping auto-increment"
           else
-            echo "Auto-incrementing version"
+            echo "Auto-incrementing version from $CURRENT_VERSION"
             BUMP_TYPE="${{ github.event.inputs.version_bump || 'patch' }}"
-            npm version $BUMP_TYPE --workspaces --no-git-tag-version
+            
+            # Version bump with error handling
+            if ! npm version $BUMP_TYPE --workspaces --no-git-tag-version; then
+              echo "Version bump failed, aborting"
+              exit 1
+            fi
+            
+            NEW_VERSION=$(node -p "require('./apps/api/package.json').version" 2>/dev/null || echo "unknown")
+            echo "Bumped to version $NEW_VERSION"
+            
             git add apps/*/package.json
-            NEW_VERSION=$(node -p "require('./apps/api/package.json').version")
             git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
             
-            # Handle potential conflicts from concurrent workflows
+            # Safe conflict resolution with retries
             git fetch origin production
-            if ! git push origin production; then
-              echo "Push rejected, handling conflicts..."
-              git stash push -m "temp stash for rebase"
-              git pull --rebase origin production
-              git stash pop
-              git add .
-              git commit --amend --no-edit
-              git push origin production
-            fi
+            for attempt in {1..3}; do
+              if git push origin production; then
+                echo "Push successful on attempt $attempt"
+                break
+              elif [ $attempt -eq 3 ]; then
+                echo "Push failed after 3 attempts, aborting"
+                exit 1
+              else
+                echo "Push rejected, attempt $attempt/3 - syncing with remote..."
+                # Reset to clean state and merge remote changes
+                git reset --soft HEAD~1
+                git pull origin production --no-edit
+                git add apps/*/package.json
+                git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+              fi
+            done
           fi
 
       - name: Deploy API to Cloudflare Workers
