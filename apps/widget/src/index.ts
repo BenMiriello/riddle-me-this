@@ -29,8 +29,15 @@ class RiddleMeThisWidget {
   }
 }
 
-// Global API
-;(window as any).RiddleMeThis = {
+interface RiddleMeThisGlobal {
+  init: (config: WidgetConfig) => void
+}
+
+const globalWindow = window as typeof window & {
+  RiddleMeThis?: RiddleMeThisGlobal
+}
+
+globalWindow.RiddleMeThis = {
   init: (config: WidgetConfig) => {
     const widget = new RiddleMeThisWidget(config)
     widget.init()
