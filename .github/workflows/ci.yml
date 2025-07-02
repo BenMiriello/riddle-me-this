@@ -115,8 +115,12 @@ jobs:
             # Handle potential conflicts from concurrent workflows
             git fetch origin production
             if ! git push origin production; then
-              echo "Push rejected, rebasing and retrying..."
+              echo "Push rejected, handling conflicts..."
+              git stash push -m "temp stash for rebase"
               git pull --rebase origin production
+              git stash pop
+              git add .
+              git commit --amend --no-edit
               git push origin production
             fi
           fi
