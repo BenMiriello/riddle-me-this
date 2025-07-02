@@ -1,10 +1,10 @@
-name: Deploy to Cloudflare
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: [production]
+    branches: [main, production]
   pull_request:
-    branches: [production]
+    branches: [main, production]
   workflow_dispatch:
     inputs:
       version_bump:
