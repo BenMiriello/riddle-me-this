@@ -4,6 +4,25 @@ import InteractiveLogo from './InteractiveLogo'
 import ChatResponse from './ChatResponse/ChatResponse'
 import { printResponse } from '../../utils'
 
+interface SearchResult {
+  title: string
+  snippet: string
+  link: string
+}
+
+interface ApiResponse {
+  answer: string
+  riddle: string
+  response: string
+  inputWasRiddle: boolean
+  needsSearch: boolean
+  searchPerformed: boolean
+  searchQuery: string | null
+  searchResults: SearchResult[]
+  primarySource: SearchResult | null
+  evaluation: string
+}
+
 const ChatContainer = () => {
   const [response, setResponse] = useState('')
   const [isTyping, setIsTyping] = useState(false)
@@ -43,7 +62,7 @@ const ChatContainer = () => {
         body: JSON.stringify({ question }),
       })
 
-      const data = await response.json()
+      const data = (await response.json()) as ApiResponse
 
       printResponse(data)
 
