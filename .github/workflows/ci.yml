@@ -111,7 +111,14 @@ jobs:
             git add apps/*/package.json
             NEW_VERSION=$(node -p "require('./apps/api/package.json').version")
             git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
-            git push origin production
+            
+            # Handle potential conflicts from concurrent workflows
+            git fetch origin production
+            if ! git push origin production; then
+              echo "Push rejected, rebasing and retrying..."
+              git pull --rebase origin production
+              git push origin production
+            fi
           fi
 
       - name: Deploy API to Cloudflare Workers

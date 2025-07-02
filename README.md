@@ -27,6 +27,16 @@ npm run build       # Build all packages
 
 For sanity and simplicity: Pre-commit hooks and CI should always be in sync. If a commit passes locally but fails in CI, see what's been changed recently in `package.json` or `ci.yml` and realign them.
 
+### Git Branch Sync Helper
+
+Automatic branch sync checking is enabled via Husky git hooks. When you checkout any branch, it automatically:
+
+- Checks if the branch is behind remote
+- Detects version mismatches in `package.json`
+- Provides interactive options to pull, view changes, or skip
+
+This helps stay synced with version bumps from the CI/CD pipeline. Note that the workflow (`ci.yml`) automatically merges remote `production` into `main` after automatically bumping the version during update/deploy.
+
 ## Deployment
 
 ### Normal Production Deploy (Recommended)
