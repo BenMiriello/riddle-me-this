@@ -117,7 +117,8 @@ jobs:
             NEW_VERSION=$(node -p "require('./apps/api/package.json').version" 2>/dev/null || echo "unknown")
             echo "Bumped to version $NEW_VERSION"
             
-            git add apps/*/package.json
+            # Add all version-related files
+            git add apps/*/package.json packages/*/package.json package-lock.json || true
             git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
             
             # Safe conflict resolution with retries
@@ -134,8 +135,13 @@ jobs:
                 # Reset to clean state and merge remote changes
                 git reset --soft HEAD~1
                 git pull origin production --no-edit
-                git add apps/*/package.json
-                git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+                # Add all version-related files that may have changed
+                git add apps/*/package.json packages/*/package.json package-lock.json || true
+                if ! git diff --cached --quiet; then
+                  git commit -m "chore: bump version to $NEW_VERSION [skip ci]"
+                else
+                  echo "No changes to commit after merge"
+                fi
               fi
             done
           fi
