@@ -30,7 +30,7 @@ class RiddleMeThisWidget {
 }
 
 // Global API
-;(window as Record<string, unknown>).RiddleMeThis = {
+;(window as any).RiddleMeThis = {
   init: (config: WidgetConfig) => {
     const widget = new RiddleMeThisWidget(config)
     widget.init()

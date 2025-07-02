@@ -1,5 +1,32 @@
 # RiddleMeThis.io
 
+## CI/CD Pipeline
+
+The project uses GitHub Actions for continuous integration and deployment.
+
+- **api**: `.github/workflows/ci.yml` will trigger deploy to Cloudflare production workers on push to `production` branch of the api.
+- **web**: Cloudflare listens for push to `production` to trigger web app production deploys.
+
+While these are both triggered by the same event they are managed by two different services and one may be done a few seconds or minutes before the other. The web app will display the versions of both `web` and `api` in browser console, and if there is a mismatch a banner will appear in the footer of the main page.
+
+### Pipeline Overview
+
+- **Main branch:** Runs tests, linting, type checking, and builds on every push
+- **Production branch:** Runs full CI pipeline + deploys to production
+- **Pre-commit hooks:** Run identical checks locally to maintain sync with CI
+
+### Quality Checks (Local & CI)
+
+Both pre-commit hooks and GitHub Actions run the same checks:
+
+```bash
+npm run lint        # ESLint checking
+npm run type-check  # TypeScript checking
+npm run build       # Build all packages
+```
+
+For sanity and simplicity: Pre-commit hooks and CI should always be in sync. If a commit passes locally but fails in CI, see what's been changed recently in `package.json` or `ci.yml` and realign them.
+
 ## Deployment
 
 ### Normal Production Deploy (Recommended)
