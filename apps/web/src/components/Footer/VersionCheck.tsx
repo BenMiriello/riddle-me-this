@@ -4,15 +4,17 @@ import packageJson from '../../../../../package.json'
 interface ApiHealth {
   status: string
   version: string
+  gitSha: string
   buildTime: string
   environment: string
 }
 
 const VersionCheck = () => {
   const [apiVersion, setApiVersion] = useState<string>('')
+  const [apiSha, setApiSha] = useState<string>('')
   const [apiEnvironment, setApiEnvironment] = useState<string>('')
   const [showMismatch, setShowMismatch] = useState(false)
-  const webVersion = (packageJson as any).version || 'dev'
+  const webVersion = (packageJson as { version?: string }).version || 'dev'
   const webSha = __GIT_SHA__.substring(0, 7)
 
   useEffect(() => {
@@ -27,27 +29,16 @@ const VersionCheck = () => {
         if (cancelled) return
 
         setApiVersion(data.version)
+        setApiSha(data.gitSha)
         setApiEnvironment(data.environment)
 
-        const apiIsDev = data.version.startsWith('dev@')
-        const isDevelopment = data.environment !== 'production'
-
-        let versionsMatch = false
-        if (isDevelopment) {
-          // Development: Compare SHAs
-          const apiSha = apiIsDev ? data.version.split('@')[1] : 'unknown'
-          versionsMatch = apiSha === webSha
-        } else {
-          // Production: Compare semantic versions
-          versionsMatch = data.version === webVersion
-        }
-
+        // Always compare SHAs for true commit-level verification
+        const versionsMatch = data.gitSha === webSha
         setShowMismatch(!versionsMatch)
 
         // Always log both version and SHA for visibility
-        const apiSha = apiIsDev ? data.version.split('@')[1] : data.version
         console.log(
-          `🔍 API: ${data.version} (${apiSha}) | Web: ${webVersion} (${webSha}) | Env: ${data.environment}`
+          `🔍 API: ${data.version} (${data.gitSha}) | Web: ${webVersion} (${webSha}) | Env: ${data.environment}`
         )
 
         if (versionsMatch) {
@@ -72,8 +63,12 @@ const VersionCheck = () => {
   if (!showMismatch) return null
 
   const isDevelopment = apiEnvironment !== 'production'
-  const apiDisplay = isDevelopment ? apiVersion : apiVersion
-  const webDisplay = isDevelopment ? `dev@${webSha}` : webVersion
+  const apiDisplay = isDevelopment
+    ? `${apiVersion} (${apiSha})`
+    : `${apiVersion} (${apiSha})`
+  const webDisplay = isDevelopment
+    ? `dev (${webSha})`
+    : `${webVersion} (${webSha})`
 
   return (
     <p className="text-xs text-yellow-400 mb-1">
