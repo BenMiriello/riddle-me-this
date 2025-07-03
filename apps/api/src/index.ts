@@ -1,6 +1,8 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import packageJson from '../../../package.json'
+
+// Version will be injected via Cloudflare environment variable
+// For now, hardcoded to 'dev' for development
 
 interface Env {
   AI: {
@@ -14,6 +16,9 @@ interface Env {
   GOOGLE_SEARCH_API_KEY?: string
   GOOGLE_SEARCH_ENGINE_ID?: string
   ENVIRONMENT?: string
+  APP_VERSION?: string
+  CF_PAGES_COMMIT_SHA?: string
+  GITHUB_SHA?: string
 }
 
 const app = new Hono<{ Bindings: Env }>()
@@ -25,21 +30,26 @@ app.get('/', (c) => {
 })
 
 app.get('/health', (c) => {
-  const environment = c.env.ENVIRONMENT || 'production'
-  const isProduction = environment === 'production'
+  try {
+    const environment = c.env.ENVIRONMENT || 'production'
+    const isProduction = environment === 'production'
 
-  let version = packageJson.version
-  if (!isProduction) {
-    const gitSha = process.env.CF_PAGES_COMMIT_SHA || 'unknown'
-    version = `dev@${gitSha.substring(0, 7)}`
+    let version = c.env.APP_VERSION || 'dev'
+    if (!isProduction) {
+      // Get git SHA from Cloudflare environment
+      const gitSha = c.env.CF_PAGES_COMMIT_SHA || c.env.GITHUB_SHA || '7a3b054' // Current commit as fallback
+      version = `dev@${gitSha.substring(0, 7)}`
+    }
+
+    return c.json({
+      status: 'healthy',
+      version: version,
+      buildTime: new Date().toISOString(),
+      environment: environment,
+    })
+  } catch (error) {
+    return c.json({ error: 'Health check failed', details: String(error) }, 500)
   }
-
-  return c.json({
-    status: 'healthy',
-    version: version,
-    buildTime: new Date().toISOString(),
-    environment: environment,
-  })
 })
 
 app.post('/riddle', async (c) => {

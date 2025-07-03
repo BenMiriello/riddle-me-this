@@ -23,6 +23,7 @@ name = "riddle-me-this-api"
 [env.production.vars]
 ENVIRONMENT = "production"
 GOOGLE_SEARCH_ENGINE_ID = "a61de03c6209d4c31"
+APP_VERSION = "0.0.1"  # Updated by deployment process
 
 [env.production.ai]
 binding = "AI"

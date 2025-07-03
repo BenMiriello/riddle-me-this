@@ -23,8 +23,9 @@ if [ "$current_branch" = "production" ]; then
     p|P)
       echo "🔼 Bumping patch version..."
       npm version patch --no-git-tag-version
-      git add package.json package-lock.json || true
-      new_version=$(node -p "require('./apps/api/package.json').version" 2>/dev/null)
+      new_version=$(node -p "require('./package.json').version" 2>/dev/null)
+      sed -i '' "s/APP_VERSION = \".*\"/APP_VERSION = \"$new_version\"/" apps/api/wrangler.toml
+      git add package.json package-lock.json apps/api/wrangler.toml || true
       git commit -m "chore: bump version to $new_version"
       echo "✅ Version bumped to v$new_version"
       ;;
@@ -35,8 +36,9 @@ if [ "$current_branch" = "production" ]; then
       if [[ "$confirm" =~ ^[Yy]$ ]]; then
         echo "🔼 Bumping minor version..."
         npm version minor --no-git-tag-version
-        git add package.json package-lock.json || true
         new_version=$(node -p "require('./package.json').version" 2>/dev/null)
+        sed -i '' "s/APP_VERSION = \".*\"/APP_VERSION = \"$new_version\"/" apps/api/wrangler.toml
+        git add package.json package-lock.json apps/api/wrangler.toml || true
         git commit -m "chore: bump version to $new_version"
         echo "✅ Version bumped to v$new_version"
       else
@@ -51,8 +53,9 @@ if [ "$current_branch" = "production" ]; then
       if [[ "$confirm" =~ ^[Yy]$ ]]; then
         echo "🔼 Bumping major version..."
         npm version major --no-git-tag-version
-        git add package.json package-lock.json || true
         new_version=$(node -p "require('./package.json').version" 2>/dev/null)
+        sed -i '' "s/APP_VERSION = \".*\"/APP_VERSION = \"$new_version\"/" apps/api/wrangler.toml
+        git add package.json package-lock.json apps/api/wrangler.toml || true
         git commit -m "chore: bump version to $new_version"
         echo "✅ Version bumped to v$new_version"
       else

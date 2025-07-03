@@ -16,10 +16,16 @@ const VersionCheck = () => {
   const webSha = __GIT_SHA__.substring(0, 7)
 
   useEffect(() => {
+    let cancelled = false
+
     const checkApiVersion = async () => {
       try {
         const response = await fetch(`${import.meta.env.VITE_API_URL}/health`)
         const data: ApiHealth = await response.json()
+
+        // This prevents printing the same thing twice
+        if (cancelled) return
+
         setApiVersion(data.version)
         setApiEnvironment(data.environment)
 
@@ -50,12 +56,18 @@ const VersionCheck = () => {
           console.warn(`⚠️ Version mismatch`)
         }
       } catch (error) {
-        console.error('Failed to check API version:', error)
+        if (!cancelled) {
+          console.error('Failed to check API version:', error)
+        }
       }
     }
 
     checkApiVersion()
-  }, [webVersion])
+
+    return () => {
+      cancelled = true
+    }
+  }, [webVersion, webSha])
 
   if (!showMismatch) return null
 
