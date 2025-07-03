@@ -2,6 +2,10 @@ name = "riddle-me-this-api"
 main = "src/index.ts"
 compatibility_date = "2025-06-30"
 
+# Default variables for local development
+[vars]
+ENVIRONMENT = "development"
+
 [ai]
 binding = "AI"
 
