@@ -29,20 +29,36 @@ if [ "$current_branch" = "production" ]; then
       echo "✅ Version bumped to v$new_version"
       ;;
     m)
-      echo "🔼 Bumping minor version..."
-      npm version minor --workspaces --no-git-tag-version
-      git add apps/*/package.json packages/*/package.json package-lock.json || true
-      new_version=$(node -p "require('./apps/api/package.json').version" 2>/dev/null)
-      git commit -m "chore: bump version to $new_version"
-      echo "✅ Version bumped to v$new_version"
+      echo "⚠️  MINOR version bump: v$current_version → v$(npx semver $current_version -i minor 2>/dev/null)"
+      printf "This indicates NEW FEATURES. Confirm? [y/N]: "
+      read -r confirm < /dev/tty
+      if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        echo "🔼 Bumping minor version..."
+        npm version minor --workspaces --no-git-tag-version
+        git add apps/*/package.json packages/*/package.json package-lock.json || true
+        new_version=$(node -p "require('./apps/api/package.json').version" 2>/dev/null)
+        git commit -m "chore: bump version to $new_version"
+        echo "✅ Version bumped to v$new_version"
+      else
+        echo "❌ Minor version bump cancelled"
+        exit 1
+      fi
       ;;
     M)
-      echo "🔼 Bumping major version..."
-      npm version major --workspaces --no-git-tag-version
-      git add apps/*/package.json packages/*/package.json package-lock.json || true
-      new_version=$(node -p "require('./apps/api/package.json').version" 2>/dev/null)
-      git commit -m "chore: bump version to $new_version"
-      echo "✅ Version bumped to v$new_version"
+      echo "🚨 MAJOR version bump: v$current_version → v$(npx semver $current_version -i major 2>/dev/null)"
+      printf "This indicates BREAKING CHANGES. Confirm? [y/N]: "
+      read -r confirm < /dev/tty
+      if [[ "$confirm" =~ ^[Yy]$ ]]; then
+        echo "🔼 Bumping major version..."
+        npm version major --workspaces --no-git-tag-version
+        git add apps/*/package.json packages/*/package.json package-lock.json || true
+        new_version=$(node -p "require('./apps/api/package.json').version" 2>/dev/null)
+        git commit -m "chore: bump version to $new_version"
+        echo "✅ Version bumped to v$new_version"
+      else
+        echo "❌ Major version bump cancelled"
+        exit 1
+      fi
       ;;
     *)
       echo "⏭️  Skipping version bump"
