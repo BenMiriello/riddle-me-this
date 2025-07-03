@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-# Run branch sync checker on checkout
-./scripts/post-checkout "$@"
+# Post-checkout hook (currently disabled)
+# ./scripts/post-checkout "$@"
