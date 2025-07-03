@@ -33,17 +33,17 @@ app.get('/health', (c) => {
   try {
     const environment = c.env.ENVIRONMENT || 'production'
     const isProduction = environment === 'production'
+    const gitSha = c.env.CF_PAGES_COMMIT_SHA || c.env.GITHUB_SHA || '7a3b054'
 
     let version = c.env.APP_VERSION || 'dev'
     if (!isProduction) {
-      // Get git SHA from Cloudflare environment
-      const gitSha = c.env.CF_PAGES_COMMIT_SHA || c.env.GITHUB_SHA || '7a3b054' // Current commit as fallback
       version = `dev@${gitSha.substring(0, 7)}`
     }
 
     return c.json({
       status: 'healthy',
       version: version,
+      gitSha: gitSha.substring(0, 7),
       buildTime: new Date().toISOString(),
       environment: environment,
     })
