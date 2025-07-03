@@ -1,6 +1,5 @@
 {
   "name": "@riddle-me-this/api",
-  "version": "dev",
   "scripts": {
     "dev": "wrangler dev --local",
     "dev:remote": "wrangler deploy --env development --minify",

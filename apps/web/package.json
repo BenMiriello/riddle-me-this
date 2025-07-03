@@ -1,7 +1,6 @@
 {
   "name": "@riddle-me-this/web",
   "private": true,
-  "version": "dev",
   "type": "module",
   "scripts": {
     "dev": "vite --host",

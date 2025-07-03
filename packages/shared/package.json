@@ -1,6 +1,5 @@
 {
   "name": "@riddle-me-this/shared",
-  "version": "dev",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

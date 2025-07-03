@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import packageJson from '../../../package.json'
+import packageJson from '../../../../../package.json'
 
 interface ApiHealth {
   status: string

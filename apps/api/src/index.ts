@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import packageJson from '../package.json'
+import packageJson from '../../../package.json'
 
 interface Env {
   AI: {
