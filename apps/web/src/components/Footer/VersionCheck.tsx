@@ -10,8 +10,10 @@ interface ApiHealth {
 
 const VersionCheck = () => {
   const [apiVersion, setApiVersion] = useState<string>('')
+  const [apiEnvironment, setApiEnvironment] = useState<string>('')
   const [showMismatch, setShowMismatch] = useState(false)
   const webVersion = packageJson.version
+  const webSha = __GIT_SHA__.substring(0, 7)
 
   useEffect(() => {
     const checkApiVersion = async () => {
@@ -19,29 +21,33 @@ const VersionCheck = () => {
         const response = await fetch(`${import.meta.env.VITE_API_URL}/health`)
         const data: ApiHealth = await response.json()
         setApiVersion(data.version)
+        setApiEnvironment(data.environment)
 
         const apiIsDev = data.version.startsWith('dev@')
-        const webIsDev = webVersion === 'dev'
+        const isDevelopment = data.environment !== 'production'
 
         let versionsMatch = false
-        if (apiIsDev && webIsDev) {
-          versionsMatch = true
-        } else if (!apiIsDev && !webIsDev) {
-          versionsMatch = data.version === webVersion
+        if (isDevelopment) {
+          // Development: Compare SHAs
+          const apiSha = apiIsDev ? data.version.split('@')[1] : 'unknown'
+          versionsMatch = apiSha === webSha
         } else {
-          versionsMatch = false
+          // Production: Compare semantic versions
+          versionsMatch = data.version === webVersion
         }
 
         setShowMismatch(!versionsMatch)
 
+        // Always log both version and SHA for visibility
+        const apiSha = apiIsDev ? data.version.split('@')[1] : data.version
+        console.log(
+          `🔍 API: ${data.version} (${apiSha}) | Web: ${webVersion} (${webSha}) | Env: ${data.environment}`
+        )
+
         if (versionsMatch) {
-          console.log(
-            `✅ Versions match - API: ${data.version}, Web: ${webVersion}`
-          )
+          console.log(`✅ Versions match`)
         } else {
-          console.warn(
-            `⚠️ Version mismatch - API: ${data.version}, Web: ${webVersion}`
-          )
+          console.warn(`⚠️ Version mismatch`)
         }
       } catch (error) {
         console.error('Failed to check API version:', error)
@@ -53,9 +59,13 @@ const VersionCheck = () => {
 
   if (!showMismatch) return null
 
+  const isDevelopment = apiEnvironment !== 'production'
+  const apiDisplay = isDevelopment ? apiVersion : apiVersion
+  const webDisplay = isDevelopment ? `dev@${webSha}` : webVersion
+
   return (
     <p className="text-xs text-yellow-400 mb-1">
-      ⚠️ API version {apiVersion} does not match Web version {webVersion}
+      ⚠️ API {apiDisplay} does not match Web {webDisplay}
     </p>
   )
 }
