@@ -2,14 +2,14 @@
 
 ## CI/CD Pipeline
 
-<!-- Note: Testing deploying through Cloudflare wich may invalidate the github actions system here -->
+**GitHub Actions:** Handles testing, linting, type checking, and builds on every push.
 
-The project uses GitHub Actions for continuous integration and deployment.
+**Cloudflare Git Integration:** Handles all deployments automatically:
 
-- **api**: `.github/workflows/ci.yml` will trigger deploy to Cloudflare production workers on push to `production` branch of the api.
-- **web**: Cloudflare listens for push to `production` to trigger web app production deploys.
+- **API (Worker):** Auto-deploys from `main` → dev environment, `production` → production environment
+- **Web (Pages):** Auto-deploys from `production` branch to riddlemethis.io
 
-While these are both triggered by the same event they are managed by two different services and one may be done a few seconds or minutes before the other. The web app will display the versions of both `web` and `api` in browser console, and if there is a mismatch a banner will appear in the footer of the main page.
+The web app displays version information in browser console and shows a banner if API/web versions don't match.
 
 ### Pipeline Overview
 
@@ -29,85 +29,57 @@ npm run build       # Build all packages
 
 For sanity and simplicity: Pre-commit hooks and CI should always be in sync. If a commit passes locally but fails in CI, see what's been changed recently in `package.json` or `ci.yml` and realign them.
 
-### Git Branch Sync Helper
+### Git Hooks
 
-Automatic branch sync checking is enabled via Husky git hooks. When you checkout any branch, it automatically:
+The project uses Husky for automated git workflows:
 
-- Checks if the branch is behind remote
-- Detects version mismatches in `package.json`
-- Provides interactive options to pull, view changes, or skip
+- **Pre-commit:** Runs linting and formatting on staged files
+- **Post-checkout:** Checks for version mismatches when switching branches, offers to sync
+- **Pre-push:** Interactive version bumping when pushing to production branch
 
-This helps stay synced with version bumps from the CI/CD pipeline. Note that the workflow (`ci.yml`) automatically merges remote `production` into `main` after automatically bumping the version during update/deploy.
+## Deployment & Version Management
 
-## Deployment
-
-### Normal Production Deploy (Recommended)
+### Production Deploy Workflow
 
 ```bash
+# 1. Develop on main branch
+git checkout main
+# ... make changes ...
+git add . && git commit -m "your changes"
+
+# 2. Deploy to production
 git checkout production
 git merge main
-git push origin production
+git push origin production  # Triggers interactive version bump
 ```
 
-- Auto-patch version bump (0.0.1 → 0.0.2)
-- Runs tests, deploys web app and API
-- Sends email notifications on failure
+### Interactive Version Bumping
 
-### Version-Controlled Production Deploy
+When pushing to `production`, a pre-push hook will prompt:
 
-```bash
-npm run deploy:prod:minor  # New features (0.0.1 → 0.1.0)
-npm run deploy:prod:major  # Breaking changes (0.0.1 → 1.0.0)
-```
+- **Patch:** Bug fixes, small changes (0.0.1 → 0.0.2)
+- **Minor:** New features, backward compatible (0.0.1 → 0.1.0)
+- **Major:** Breaking changes (0.0.1 → 1.0.0)
+- **No bump:** Deploy current version
 
-- Runs tests and full deployment locally
-- Skips auto-increment when pushed to production
-
-### Emergency Deploy (API Only)
+### Manual Version Control
 
 ```bash
-npm run deploy:prod  # Tests + API deploy, no version change
-```
-
-### Version Management
-
-- **Patch (0.0.1 → 0.0.2):** Bug fixes, small changes, daily deploys
-- **Minor (0.0.1 → 0.1.0):** New features, backward compatible updates
-- **Major (0.0.1 → 1.0.0):** Breaking changes, major releases
-
-**Manual version bump (optional):**
-
-```bash
+# If you need to bump versions outside of deployment:
 npm version patch --workspaces   # Bug fixes
 npm version minor --workspaces   # New features
 npm version major --workspaces   # Breaking changes
+git add . && git commit -m "chore: bump version to X.X.X"
 ```
 
-When manually bumping versions, use `npm run deploy:prod` to skip auto-version-bump.
+### Environments
 
-**Typical workflow:**
-
-1. Work on `main` branch
-2. When ready: `git checkout production && git merge main && git push origin production`
-3. GitHub Actions handles versioning and deployment automatically
-
-**Optional GitHub Actions manual deploy:** Go to Actions tab → "Deploy to Cloudflare" → "Run workflow" → Select version bump type
+- **Development:** `main` branch → `riddle-me-this-api-dev.benmiriello.workers.dev`
+- **Production:** `production` branch → `riddlemethis.io` (web) + `riddle-me-this-api.benmiriello.workers.dev` (API)
 
 ### Rollback
 
 ```bash
-# Rollback both web and API:
 git revert <commit-hash>
-git checkout production
-git merge main
-git push origin production
-
-# Quick API-only rollback:
-git revert <commit-hash>
-npm run deploy:prod
+git push origin production  # Cloudflare auto-deploys the rollback
 ```
-
-### Version Check
-
-- Web app displays version mismatch warnings if API/web versions differ
-- Check `/health` endpoint for API version info

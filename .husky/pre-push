@@ -1,0 +1,51 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Interactive version bump when pushing to production
+current_branch=$(git branch --show-current)
+if [ "$current_branch" = "production" ]; then
+  echo "🚀 Pushing to production branch!"
+  
+  current_version=$(node -p "require('./apps/api/package.json').version" 2>/dev/null || echo "unknown")
+  echo "📦 Current version: v$current_version"
+  echo ""
+  echo "Bump version before deploy?"
+  echo "  [p] Patch (bug fixes)     - v$current_version → v$(npx semver $current_version -i patch 2>/dev/null || echo '?.?.?')"
+  echo "  [m] Minor (new features)  - v$current_version → v$(npx semver $current_version -i minor 2>/dev/null || echo '?.?.?')"  
+  echo "  [M] Major (breaking)      - v$current_version → v$(npx semver $current_version -i major 2>/dev/null || echo '?.?.?')"
+  echo "  [n] No bump (default)"
+  echo ""
+  printf "Your choice [p/m/M/n]: "
+  read -r choice
+  
+  case $choice in
+    p|P)
+      echo "🔼 Bumping patch version..."
+      npm version patch --workspaces --no-git-tag-version
+      git add apps/*/package.json packages/*/package.json package-lock.json || true
+      new_version=$(node -p "require('./apps/api/package.json').version" 2>/dev/null)
+      git commit -m "chore: bump version to $new_version"
+      echo "✅ Version bumped to v$new_version"
+      ;;
+    m)
+      echo "🔼 Bumping minor version..."
+      npm version minor --workspaces --no-git-tag-version
+      git add apps/*/package.json packages/*/package.json package-lock.json || true
+      new_version=$(node -p "require('./apps/api/package.json').version" 2>/dev/null)
+      git commit -m "chore: bump version to $new_version"
+      echo "✅ Version bumped to v$new_version"
+      ;;
+    M)
+      echo "🔼 Bumping major version..."
+      npm version major --workspaces --no-git-tag-version
+      git add apps/*/package.json packages/*/package.json package-lock.json || true
+      new_version=$(node -p "require('./apps/api/package.json').version" 2>/dev/null)
+      git commit -m "chore: bump version to $new_version"
+      echo "✅ Version bumped to v$new_version"
+      ;;
+    *)
+      echo "⏭️  Skipping version bump"
+      ;;
+  esac
+  echo ""
+fi
