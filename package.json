@@ -1,6 +1,5 @@
 {
   "name": "riddle-me-this",
-  "version": "dev",
   "private": true,
   "type": "module",
   "workspaces": [
