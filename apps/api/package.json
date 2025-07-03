@@ -1,7 +1,7 @@
 {
   "name": "@riddle-me-this/api",
   "scripts": {
-    "dev": "wrangler dev --local",
+    "dev": "wrangler dev --local --env development",
     "dev:remote": "wrangler deploy --env development --minify",
     "build": "echo 'API builds during deployment with wrangler deploy'",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings"
