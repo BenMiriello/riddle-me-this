@@ -1,6 +1,6 @@
 {
   "name": "@riddle-me-this/widget",
-  "version": "0.0.1",
+  "version": "dev",
   "type": "module",
   "main": "index.js",
   "scripts": {

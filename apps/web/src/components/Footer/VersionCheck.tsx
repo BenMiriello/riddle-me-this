@@ -20,7 +20,18 @@ const VersionCheck = () => {
         const data: ApiHealth = await response.json()
         setApiVersion(data.version)
 
-        const versionsMatch = data.version === webVersion
+        const apiIsDev = data.version.startsWith('dev@')
+        const webIsDev = webVersion === 'dev'
+
+        let versionsMatch = false
+        if (apiIsDev && webIsDev) {
+          versionsMatch = true
+        } else if (!apiIsDev && !webIsDev) {
+          versionsMatch = data.version === webVersion
+        } else {
+          versionsMatch = false
+        }
+
         setShowMismatch(!versionsMatch)
 
         if (versionsMatch) {
