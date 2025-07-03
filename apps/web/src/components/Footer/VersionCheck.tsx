@@ -12,7 +12,7 @@ const VersionCheck = () => {
   const [apiVersion, setApiVersion] = useState<string>('')
   const [apiEnvironment, setApiEnvironment] = useState<string>('')
   const [showMismatch, setShowMismatch] = useState(false)
-  const webVersion = packageJson.version
+  const webVersion = (packageJson as any).version || 'dev'
   const webSha = __GIT_SHA__.substring(0, 7)
 
   useEffect(() => {
