@@ -22,8 +22,8 @@ if [ "$current_branch" = "production" ]; then
   case $choice in
     p|P)
       echo "🔼 Bumping patch version..."
-      npm version patch --workspaces --no-git-tag-version
-      git add apps/*/package.json packages/*/package.json package-lock.json || true
+      npm version patch --no-git-tag-version
+      git add package.json package-lock.json || true
       new_version=$(node -p "require('./apps/api/package.json').version" 2>/dev/null)
       git commit -m "chore: bump version to $new_version"
       echo "✅ Version bumped to v$new_version"
@@ -34,8 +34,8 @@ if [ "$current_branch" = "production" ]; then
       read -r confirm < /dev/tty
       if [[ "$confirm" =~ ^[Yy]$ ]]; then
         echo "🔼 Bumping minor version..."
-        npm version minor --workspaces --no-git-tag-version
-        git add apps/*/package.json packages/*/package.json package-lock.json || true
+        npm version minor --no-git-tag-version
+        git add package.json package-lock.json || true
         new_version=$(node -p "require('./package.json').version" 2>/dev/null)
         git commit -m "chore: bump version to $new_version"
         echo "✅ Version bumped to v$new_version"
@@ -50,8 +50,8 @@ if [ "$current_branch" = "production" ]; then
       read -r confirm < /dev/tty
       if [[ "$confirm" =~ ^[Yy]$ ]]; then
         echo "🔼 Bumping major version..."
-        npm version major --workspaces --no-git-tag-version
-        git add apps/*/package.json packages/*/package.json package-lock.json || true
+        npm version major --no-git-tag-version
+        git add package.json package-lock.json || true
         new_version=$(node -p "require('./package.json').version" 2>/dev/null)
         git commit -m "chore: bump version to $new_version"
         echo "✅ Version bumped to v$new_version"

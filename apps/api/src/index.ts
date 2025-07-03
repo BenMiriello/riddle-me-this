@@ -29,7 +29,7 @@ app.get('/health', (c) => {
   const isProduction = environment === 'production'
 
   let version = packageJson.version
-  if (!isProduction && packageJson.version === 'dev') {
+  if (!isProduction) {
     const gitSha = process.env.CF_PAGES_COMMIT_SHA || 'unknown'
     version = `dev@${gitSha.substring(0, 7)}`
   }
