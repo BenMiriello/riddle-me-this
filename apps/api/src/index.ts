@@ -1,6 +1,6 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
-import packageJson from '../package.json'
+import packageJson from '../../../package.json'
 
 interface Env {
   AI: {
@@ -25,11 +25,20 @@ app.get('/', (c) => {
 })
 
 app.get('/health', (c) => {
+  const environment = c.env.ENVIRONMENT || 'production'
+  const isProduction = environment === 'production'
+
+  let version = packageJson.version
+  if (!isProduction && packageJson.version === 'dev') {
+    const gitSha = process.env.CF_PAGES_COMMIT_SHA || 'unknown'
+    version = `dev@${gitSha.substring(0, 7)}`
+  }
+
   return c.json({
     status: 'healthy',
-    version: packageJson.version,
+    version: version,
     buildTime: new Date().toISOString(),
-    environment: c.env.ENVIRONMENT || 'production',
+    environment: environment,
   })
 })
 
