@@ -60,21 +60,12 @@ app.post('/riddle', async (c) => {
       return c.json({ error: 'Question is required' }, 400)
     }
 
-    // 5 criteria for riddle detection - format as evaluatable object
-    const riddleCriteria = `
-    Evaluate these 5 criteria and respond with this exact format:
-    RIDDLE_EVAL: { "hasRhyme": boolean, "hasMetaphor": boolean, "hasImplicitSubject": boolean, "hasPlayfulLanguage": boolean, "hasStructure": boolean }
-
-    Criteria:
-    1. hasRhyme: Contains rhyming words or patterns
-    2. hasMetaphor: Uses metaphorical or indirect references instead of literal terms
-    3. hasImplicitSubject: The main subject is hidden/veiled rather than explicitly stated
-    4. hasPlayfulLanguage: Uses archaic, whimsical, or mysterious phrasing
-    5. hasStructure: Follows a poetic structure (couplets, verses, etc.)
-    `
-
     // Note: we want to add more granularity to the structure later (not yet),
     // such as 'iambic pentameter' (bard badge) or 'haiku' or other
+
+    // Idea: Use that list of best riddles as examples to develop better prompting
+    // But also use them as autosuggestions
+    // And include easter eggs for famous riddles like "what have I got in my pocket" with some response that honors the source
 
     const howToWriteARiddle = `
     Write a SHORT riddle (2-4 lines maximum) that:
@@ -90,53 +81,127 @@ app.post('/riddle', async (c) => {
     Length: 2-4 lines only. Be concise!
     `
 
-    // Step 0: Determine if search is needed
-    const searchDetectionResponse = await c.env.AI.run(
+    // Step 0: Combined detection - search needs AND riddle evaluation in one call
+    const detectionResponse = await c.env.AI.run(
       '@cf/meta/llama-3-8b-instruct',
       {
         messages: [
           {
             role: 'system',
-            content: `Determine if this question requires current information from the web. Respond with only "SEARCH" or "KNOWLEDGE".
+            content: `Analyze this question and respond with EXACTLY this JSON format:
 
-SEARCH for:
-- Current events, news, or recent information
-- Location-based queries (near me, in [city])
-- Real-time data (weather, stock prices, movie showtimes)
-- Recent developments or updates
+{
+  "needsSearch": "SEARCH" | "KNOWLEDGE",
+  "riddleEval": {
+    "hasRhyme": boolean,
+    "hasMetaphor": boolean,
+    "hasImplicitSubject": boolean,
+    "hasPlayfulLanguage": boolean,
+    "hasStructure": boolean
+  }
+}
 
-KNOWLEDGE for:
-- General facts, definitions, explanations
-- Historical information
-- Math, science, concepts
-- How-to questions with established answers
+SEARCH vs KNOWLEDGE:
+- SEARCH for: current events, news, location-based queries, real-time data, recent developments
+- KNOWLEDGE for: general facts, definitions, historical info, math/science concepts, how-to questions
 
-Respond with only one word: SEARCH or KNOWLEDGE`,
+Riddle criteria:
+1. hasRhyme: Contains rhyming words or patterns
+2. hasMetaphor: Uses metaphorical or indirect references instead of literal terms
+3. hasImplicitSubject: The main subject is hidden/veiled rather than explicitly stated
+4. hasPlayfulLanguage: Uses archaic, whimsical, or mysterious phrasing
+5. hasStructure: Follows a poetic structure (couplets, verses, etc.)
+
+Respond with ONLY the JSON object, nothing else.`,
           },
           { role: 'user', content: question },
         ],
       }
     )
 
-    const needsSearch = searchDetectionResponse.response
-      .trim()
-      .toUpperCase()
-      .includes('SEARCH')
+    // Parse combined detection response
+    let needsSearch = false
+    let inputWasRiddle = false
+    try {
+      const detectionData = JSON.parse(detectionResponse.response)
+      needsSearch = detectionData.needsSearch === 'SEARCH'
+
+      if (detectionData.riddleEval) {
+        const trueCount = Object.values(detectionData.riddleEval).filter(
+          (v) => v === true
+        ).length
+        inputWasRiddle = trueCount >= 2
+      }
+    } catch (error) {
+      console.log('Detection parsing error:', error)
+      // Fallback: assume knowledge-based and not a riddle
+      needsSearch = false
+      inputWasRiddle = false
+    }
 
     console.log('Environment check:')
     console.log('needsSearch:', needsSearch)
+    console.log('inputWasRiddle:', inputWasRiddle)
     console.log('Has API key:', !!c.env.GOOGLE_SEARCH_API_KEY)
     console.log('API key length:', c.env.GOOGLE_SEARCH_API_KEY?.length || 0)
     console.log('Has Search Engine ID:', !!c.env.GOOGLE_SEARCH_ENGINE_ID)
 
-    // Step 1: Generate answer (with or without search)
+    // Step 1: Decipher riddle if input was a riddle
+    let searchQuery = question
+    let riddleDecipherResponse = null
+    if (inputWasRiddle) {
+      riddleDecipherResponse = await c.env.AI.run(
+        '@cf/meta/llama-3-8b-instruct',
+        {
+          messages: [
+            {
+              role: 'system',
+              content: `Decipher this riddle and provide the answer. Respond with EXACTLY this JSON format:
+
+{
+  "answer": "the actual answer/topic the riddle is asking about",
+  "confidence": 0-100,
+  "keyTerms": ["key", "terms", "from", "original", "riddle"]
+}
+
+- answer: What you think the riddle is asking about
+- confidence: How confident you are (0-100%) that your answer is correct
+- keyTerms: 3-5 important words from the original riddle that could help with searching
+
+If you're less than 50% confident, extract more key terms to help with search.
+Respond with ONLY the JSON object, nothing else.`,
+            },
+            { role: 'user', content: question },
+          ],
+        }
+      )
+
+      try {
+        const decipherData = JSON.parse(riddleDecipherResponse.response)
+        if (decipherData.confidence >= 50) {
+          searchQuery = decipherData.answer
+        } else {
+          // Low confidence: combine answer with key terms
+          searchQuery = `${decipherData.answer} ${decipherData.keyTerms.join(' ')}`
+        }
+        console.log('Riddle deciphered:', decipherData)
+        console.log('Search query:', searchQuery)
+      } catch (error) {
+        console.log('Riddle decipher parsing error:', error)
+        console.log('Raw riddle response:', riddleDecipherResponse.response)
+        // Fallback: use original question
+        searchQuery = question
+      }
+    }
+
+    // Step 2: Generate answer (with or without search)
     let answerResponse
     let searchResults: Array<{ title: string; snippet: string; link: string }> =
       []
     if (needsSearch && c.env.GOOGLE_SEARCH_API_KEY) {
       try {
-        const searchQuery = encodeURIComponent(question)
-        const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${c.env.GOOGLE_SEARCH_API_KEY}&cx=${c.env.GOOGLE_SEARCH_ENGINE_ID}&q=${searchQuery}&num=3`
+        const encodedSearchQuery = encodeURIComponent(searchQuery)
+        const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${c.env.GOOGLE_SEARCH_API_KEY}&cx=${c.env.GOOGLE_SEARCH_ENGINE_ID}&q=${encodedSearchQuery}&num=3`
 
         const searchResponse = await fetch(searchUrl)
         const searchData = (await searchResponse.json()) as {
@@ -170,7 +235,7 @@ Respond with only one word: SEARCH or KNOWLEDGE`,
             },
             {
               role: 'user',
-              content: `Question: ${question}\n\nSource: ${searchContext}\n\nAnswer:`,
+              content: `Question: ${searchQuery}\n\nSource: ${searchContext}\n\nAnswer:`,
             },
           ],
         })
@@ -184,7 +249,7 @@ Respond with only one word: SEARCH or KNOWLEDGE`,
               content:
                 'This question requires current information, but search is unavailable. Provide the best general answer you can.',
             },
-            { role: 'user', content: question },
+            { role: 'user', content: searchQuery },
           ],
         })
       }
@@ -197,47 +262,9 @@ Respond with only one word: SEARCH or KNOWLEDGE`,
             content:
               'Answer directly and concisely. Be brief. Give only essential information. No fluff or explanations unless necessary.',
           },
-          { role: 'user', content: question },
+          { role: 'user', content: searchQuery },
         ],
       })
-    }
-
-    // Step 2: Evaluate if input was a riddle
-    const evaluationResponse = await c.env.AI.run(
-      '@cf/meta/llama-3-8b-instruct',
-      {
-        messages: [
-          {
-            role: 'system',
-            content: `Evaluate if this question is written as a riddle. Look carefully for:
-- Metaphors or indirect references ("canvas of connections" = metaphor)
-- Mysterious/whimsical language ("where thoughts and faces blend" = playful)
-- Hidden subjects (not stating the thing directly)
-
-${riddleCriteria}
-
-Respond with only the JSON object, nothing else.`,
-          },
-          { role: 'user', content: question },
-        ],
-      }
-    )
-
-    // Parse riddle evaluation
-    let inputWasRiddle = false
-    try {
-      const evalMatch = evaluationResponse.response.match(
-        /{\s*"hasRhyme"[\s\S]*?}/
-      )
-      if (evalMatch) {
-        const evalObj = JSON.parse(evalMatch[0])
-        const trueCount = Object.values(evalObj).filter(
-          (v) => v === true
-        ).length
-        inputWasRiddle = trueCount >= 2
-      }
-    } catch {
-      // If evaluation fails, assume not a riddle
     }
 
     // Step 3: Generate riddle if input wasn't a riddle
@@ -269,11 +296,13 @@ Return ONLY the riddle, nothing else. Maximum 4 lines.`,
       response: finalResponse,
       inputWasRiddle: inputWasRiddle,
       needsSearch: needsSearch,
-      searchQuery: needsSearch ? question : null,
+      searchQuery: needsSearch ? searchQuery : null,
+      originalQuestion: question,
       searchResults: searchResults,
       primarySource: searchResults[0] || null,
       searchPerformed: needsSearch && !!c.env.GOOGLE_SEARCH_API_KEY,
-      evaluation: evaluationResponse.response,
+      evaluation: detectionResponse.response,
+      riddleDecipher: riddleDecipherResponse?.response || null,
     })
   } catch (error) {
     console.error('Error:', error)
