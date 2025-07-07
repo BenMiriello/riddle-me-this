@@ -17,3 +17,4 @@ const searchDetection = ({
 }
 
 export default searchDetection
+export type { SearchDetectionInput, SearchDetectionOutput }

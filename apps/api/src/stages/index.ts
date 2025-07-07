@@ -1,21 +1,15 @@
-import riddleDetection from './riddleDetection'
-import riddleDecipher from './riddleDecipher'
-import searchDetection from './searchDetection'
+import detectionStage from './riddleDetection'
+import decipherStage from './riddleDecipher'
 import searchStage from './searchStage'
-import knowledgeStage from './knowledgeStage'
-import answerGeneration from './answerGeneration'
-import riddleGeneration from './riddleGeneration'
-import plainTextResponse from './plainTextResponse'
-import handleFinalMerge from './handleFinalMerge'
+import answerStage from './answerGeneration'
+import riddleGenerationStage from './riddleGeneration'
+import createFinalResponse from './handleFinalMerge'
 
 export {
-  riddleDetection,
-  riddleDecipher,
-  searchDetection,
+  detectionStage,
+  decipherStage,
   searchStage,
-  knowledgeStage,
-  answerGeneration,
-  riddleGeneration,
-  plainTextResponse,
-  handleFinalMerge,
+  answerStage,
+  riddleGenerationStage,
+  createFinalResponse,
 }

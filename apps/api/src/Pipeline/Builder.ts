@@ -44,15 +44,15 @@ export type PipelineContext<TSteps extends Record<string, any>> = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface StepOptions<TSteps extends Record<string, any>> {
   when?: string | ((pl: PipelineContext<TSteps>) => boolean)
-  after?: readonly string[]
+  after?: string[]
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   merge?: (pl: PipelineContext<TSteps>) => Record<string, any>
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface BranchStage<
   TInput,
   TOutput,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   TSteps extends Record<string, any>,
 > {
   stage: Stage<TInput, TOutput>
@@ -61,7 +61,7 @@ export interface BranchStage<
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface BranchOptions<TSteps extends Record<string, any>> {
-  after?: readonly string[]
+  after?: string[]
   split?: (pl: PipelineContext<TSteps>) => string
 }
 
@@ -74,10 +74,27 @@ export interface Step {
   options?: any
 }
 
+// Type to extract property keys from stage output types
+type ExtractKeys<T> = T extends Record<string, unknown> ? keyof T : never
+
+// Type to check for property conflicts between steps
+// eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any
+type CheckPropertyConflicts<TSteps extends Record<string, any>> = {
+  [K1 in keyof TSteps]: {
+    [K2 in keyof TSteps]: K1 extends K2
+      ? never
+      : ExtractKeys<TSteps[K1]> & ExtractKeys<TSteps[K2]> extends never
+        ? never
+        : `Property conflict: Step '${K1 & string}' and '${K2 & string}' both output property '${ExtractKeys<TSteps[K1]> & ExtractKeys<TSteps[K2]> & string}'`
+  }[keyof TSteps]
+}[keyof TSteps]
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-empty-object-type
 export class PipelineBuilder<TSteps extends Record<string, any> = {}> {
   private steps: Map<string, Step> = new Map()
   private dependencies: Map<string, string[]> = new Map()
+  private stepOrder: string[] = []
+  private outputProperties: Set<string> = new Set()
 
   step<TName extends string, TInput, TOutput>(
     name: ValidStepName<TName> extends never
@@ -94,6 +111,10 @@ export class PipelineBuilder<TSteps extends Record<string, any> = {}> {
       throw new Error(`Step name '${name}' is already used`)
     }
 
+    // TODO: Add runtime property conflict detection
+    // We'd need to inspect the stage's output type at runtime to detect conflicts
+    // For now, TypeScript compile-time checking will catch most issues
+
     if (options?.merge && !options?.after) {
       throw new Error(
         `Step '${name}' has merge function but no 'after' dependencies`
@@ -101,9 +122,14 @@ export class PipelineBuilder<TSteps extends Record<string, any> = {}> {
     }
 
     this.steps.set(name as string, { stage, options })
+    this.stepOrder.push(name as string)
 
+    // Auto-dependency: if no 'after' specified and not the first step, depend on previous step
     if (options?.after) {
       this.dependencies.set(name as string, options.after as string[])
+    } else if (this.stepOrder.length > 1 && !options?.when && !options?.merge) {
+      const previousStep = this.stepOrder[this.stepOrder.length - 2]
+      this.dependencies.set(name as string, [previousStep])
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -111,9 +137,9 @@ export class PipelineBuilder<TSteps extends Record<string, any> = {}> {
   }
 
   branch<
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     TBranches extends Record<
       string,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       Stage<any, any> | BranchStage<any, any, TSteps>
     >,
   >(
@@ -125,6 +151,7 @@ export class PipelineBuilder<TSteps extends Record<string, any> = {}> {
     options?: BranchOptions<TSteps>
   ): PipelineBuilder<
     TSteps & {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       [K in keyof TBranches]: TBranches[K] extends Stage<any, infer TOutput>
         ? TOutput
         : // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -137,6 +164,8 @@ export class PipelineBuilder<TSteps extends Record<string, any> = {}> {
       if (this.steps.has(stepName)) {
         throw new Error(`Step name '${stepName}' is already used`)
       }
+
+      this.stepOrder.push(stepName)
 
       if (
         typeof stageConfig === 'object' &&
@@ -173,14 +202,15 @@ export class PipelineBuilder<TSteps extends Record<string, any> = {}> {
         : TName,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mergerFn: (input: any) => TOutput,
-    options: { after: readonly string[] }
+    options: { after: string[] }
   ): PipelineBuilder<TSteps & Record<TName, TOutput>> {
     if (this.steps.has(name as string)) {
       throw new Error(`Step name '${name}' is already used`)
     }
 
+    this.stepOrder.push(name as string)
     this.steps.set(name as string, { mergerFn, options })
-    this.dependencies.set(name as string, options.after as string[])
+    this.dependencies.set(name as string, options.after)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     return this as any
   }

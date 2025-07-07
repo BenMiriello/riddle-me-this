@@ -34,34 +34,24 @@ export class Workflow {
         }
       }
 
+      // Start with initial input and flatten all previous step results
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let stepInput: any = {}
+      let stepInput: any = { ...initialInput }
 
-      // Combine outputs from dependencies + merge function
-      if (step.options?.merge && step.options?.after) {
-        // Collect outputs from dependency steps
-        for (const depName of step.options.after) {
-          const depResult = results.get(depName)
-          if (depResult) {
-            stepInput = { ...stepInput, ...depResult }
-          }
+      // Flatten ALL previous step results into the input (not just dependencies)
+      for (const [, resultValue] of results.entries()) {
+        if (resultValue && typeof resultValue === 'object') {
+          stepInput = { ...stepInput, ...resultValue }
         }
+      }
 
-        // Apply merge function and add its output
+      // Handle merge function if present
+      if (step.options?.merge) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const mergeResult = step.options.merge(context as PipelineContext<any>)
-        stepInput = { ...stepInput, ...mergeResult }
-      } else if (step.options?.after) {
-        // Regular dependency handling
-        for (const depName of step.options.after) {
-          const depResult = results.get(depName)
-          if (depResult) {
-            stepInput = { ...stepInput, ...depResult }
-          }
+        if (mergeResult && typeof mergeResult === 'object') {
+          stepInput = { ...stepInput, ...mergeResult }
         }
-      } else {
-        // Use initial input for first step
-        stepInput = initialInput
       }
 
       // Execute step
@@ -90,9 +80,9 @@ export class Workflow {
     return results.get(finalSteps[finalSteps.length - 1])
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private evaluateStringCondition(
     condition: string,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     context: Partial<PipelineContext<any>>
   ): boolean {
     // Handle string conditions like 'detect.isRiddle'

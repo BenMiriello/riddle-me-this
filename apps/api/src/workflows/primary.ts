@@ -1,55 +1,61 @@
 import { pipeline } from '../Pipeline'
 import {
-  riddleDetection,
-  riddleDecipher,
-  searchDetection,
+  detectionStage,
+  decipherStage,
   searchStage,
-  knowledgeStage,
-  answerGeneration,
-  plainTextResponse,
-  riddleGeneration,
-  handleFinalMerge,
+  answerStage,
+  riddleGenerationStage,
+  createFinalResponse,
 } from '../stages'
+import type { DetectionOutput } from '../stages/riddleDetection'
 
-const needsSearch = (pl: {
-  searchCheck: { result: { needsSearch: boolean } }
-}) => pl.searchCheck.result.needsSearch
+// Workflow input type - defined where the workflow is defined
+interface WorkflowInput {
+  question: string
+  env: {
+    AI: {
+      run: (
+        model: string,
+        options: { messages: Array<{ role: string; content: string }> }
+      ) => Promise<{ response: string }>
+    }
+    GOOGLE_SEARCH_API_KEY?: string
+    GOOGLE_SEARCH_ENGINE_ID?: string
+    AI_MODEL?: string
+  }
+}
 
-const mergeQuestion = (pl: {
-  decipher?: { result?: { decipheredInput?: string } }
-  detect?: { result?: { userInput?: string } }
-}) => ({
-  plainTextQuestion:
-    pl.decipher?.result?.decipheredInput || pl.detect?.result?.userInput,
-})
+// Conditional helper functions
+const shouldDecipher = (pl: {
+  detection: { result: DetectionOutput }
+}): boolean => pl.detection.result.inputWasRiddle
 
-const answerInRiddle = (pl: { detect: { result: { isRiddle: boolean } } }) =>
-  pl.detect.result.isRiddle
+const shouldSearch = (pl: {
+  detection: { result: DetectionOutput }
+}): boolean => pl.detection.result.needsSearch
 
-const workflow = pipeline()
-  .step('detect', riddleDetection)
-  .step('decipher', riddleDecipher, { when: 'detect.isRiddle' })
-  .step('searchCheck', searchDetection, {
-    merge: mergeQuestion,
-    after: ['detect', 'decipher'] as const,
+const shouldGenerateRiddle = (pl: {
+  detection: { result: DetectionOutput }
+}): boolean => !pl.detection.result.inputWasRiddle
+
+// Create the workflow
+const originalWorkflow = pipeline()
+  .step('detection', detectionStage)
+  .step('decipher', decipherStage, { when: shouldDecipher })
+  .step('search', searchStage, {
+    when: shouldSearch,
+    after: ['detection', 'decipher'],
   })
-  .branch({
-    webSearch: { stage: searchStage, when: (pl) => needsSearch(pl) },
-    knowledgeAnswer: { stage: knowledgeStage, when: (pl) => !needsSearch(pl) },
+  .step('answer', answerStage, {
+    after: ['detection', 'decipher', 'search'],
   })
-  .step('answer', answerGeneration, {
-    after: ['webSearch', 'knowledgeAnswer'] as const,
-  })
-  .branch({
-    normalAnswer: {
-      stage: plainTextResponse,
-      when: (pl) => answerInRiddle(pl),
-    },
-    makeRiddle: { stage: riddleGeneration, when: (pl) => !answerInRiddle(pl) },
-  })
-  .merge('finalResponse', handleFinalMerge, {
-    after: ['normalAnswer', 'makeRiddle'] as const,
+  .step('riddle', riddleGenerationStage, { when: shouldGenerateRiddle })
+  .merge('final', createFinalResponse, {
+    after: ['detection', 'decipher', 'search', 'answer', 'riddle'],
   })
   .build()
 
-export default workflow
+export default originalWorkflow
+export type { WorkflowInput }
+// Output type is inferred from createFinalResponse in ../stages/handleFinalMerge
+export type { FinalOutput } from '../stages/handleFinalMerge'
