@@ -1,9 +1,10 @@
 import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import originalWorkflow, {
-  type WorkflowInput,
+  type WorkflowV1Input,
   type FinalOutput,
-} from './workflows/primary'
+} from './workflows/v1'
+import WorkflowV2, { type WorkflowV2Input } from './workflows/v2'
 
 interface Env {
   AI: {
@@ -17,6 +18,7 @@ interface Env {
   GOOGLE_SEARCH_API_KEY?: string
   GOOGLE_SEARCH_ENGINE_ID?: string
   AI_MODEL?: string
+  RIDDLE_PROMPT_MODE?: 'verbose' | 'concise'
   ENVIRONMENT?: string
   APP_VERSION?: string
   CF_PAGES_COMMIT_SHA?: string
@@ -62,7 +64,7 @@ app.post('/riddle', async (c) => {
       return c.json({ error: 'Question is required' }, 400)
     }
 
-    const workflowInput: WorkflowInput = {
+    const workflowInput: WorkflowV1Input = {
       question,
       env: {
         AI: c.env.AI,
@@ -75,6 +77,34 @@ app.post('/riddle', async (c) => {
     const result = (await originalWorkflow.execute(
       workflowInput
     )) as FinalOutput
+
+    return c.json(result)
+  } catch (error) {
+    console.error('Error:', error)
+    return c.json({ error: 'Failed to process question' }, 500)
+  }
+})
+
+app.post('/riddle/v2', async (c) => {
+  try {
+    const { question } = await c.req.json()
+
+    if (!question) {
+      return c.json({ error: 'Question is required' }, 400)
+    }
+
+    const workflowInput: WorkflowV2Input = {
+      question,
+      env: {
+        AI: c.env.AI,
+        GOOGLE_SEARCH_API_KEY: c.env.GOOGLE_SEARCH_API_KEY,
+        GOOGLE_SEARCH_ENGINE_ID: c.env.GOOGLE_SEARCH_ENGINE_ID,
+        AI_MODEL: c.env.AI_MODEL,
+        RIDDLE_PROMPT_MODE: c.env.RIDDLE_PROMPT_MODE,
+      },
+    }
+
+    const result = await WorkflowV2.execute(workflowInput)
 
     return c.json(result)
   } catch (error) {
