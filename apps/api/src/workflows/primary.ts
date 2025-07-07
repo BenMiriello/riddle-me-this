@@ -6,8 +6,8 @@ import {
   answerStage,
   riddleGenerationStage,
   createFinalResponse,
-} from '../stages'
-import type { DetectionOutput } from '../stages/riddleDetection'
+} from '../stages/primary'
+import type { DetectionOutput } from '../stages/primary/riddleDetection'
 
 // Workflow input type - defined where the workflow is defined
 interface WorkflowInput {
@@ -58,4 +58,4 @@ const originalWorkflow = pipeline()
 export default originalWorkflow
 export type { WorkflowInput }
 // Output type is inferred from createFinalResponse in ../stages/handleFinalMerge
-export type { FinalOutput } from '../stages/handleFinalMerge'
+export type { FinalOutput } from '../stages/primary/handleFinalMerge'
