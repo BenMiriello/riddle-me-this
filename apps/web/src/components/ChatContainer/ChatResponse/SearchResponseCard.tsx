@@ -10,7 +10,7 @@ interface SearchResponseCardProps {
   response: string
   isTyping: boolean
   loadingDots: string
-  primarySource: SourceType
+  primarySource: SourceType | null
 }
 
 const SearchResponseCard = ({
@@ -42,6 +42,8 @@ const SearchResponseCard = ({
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
 
   const handleClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!primarySource) return
+
     if (isMobile) {
       // Mobile: first tap shows URL, second tap allows navigation
       if (!showSourceUrl) {
@@ -69,30 +71,32 @@ const SearchResponseCard = ({
         {isTyping && response && <span className="animate-pulse">|</span>}
       </div>
 
-      <a
-        href={primarySource.link}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="flex justify-between items-center cursor-pointer group no-underline"
-        onClick={handleClick}
-        {...(!isMobile && {
-          onMouseEnter: () => typeSourceUrl(primarySource.link),
-          onMouseLeave: () => setShowSourceUrl(false),
-        })}
-        onContextMenu={(e) => handleContextMenu(e, primarySource.link)}
-      >
-        <div className="flex-1 mr-4 min-w-0">
-          {showSourceUrl && (
-            <div className="text-xs text-blue-300 active:text-blue-100 truncate">
-              {sourceUrl}
-            </div>
-          )}
-        </div>
+      {primarySource && (
+        <a
+          href={primarySource.link}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex justify-between items-center cursor-pointer group no-underline"
+          onClick={handleClick}
+          {...(!isMobile && {
+            onMouseEnter: () => typeSourceUrl(primarySource.link),
+            onMouseLeave: () => setShowSourceUrl(false),
+          })}
+          onContextMenu={(e) => handleContextMenu(e, primarySource.link)}
+        >
+          <div className="flex-1 mr-4 min-w-0">
+            {showSourceUrl && (
+              <div className="text-xs text-blue-300 active:text-blue-100 truncate">
+                {sourceUrl}
+              </div>
+            )}
+          </div>
 
-        <button className="text-xs text-gray-400 group-hover:text-blue-300 active:text-blue-100 transition-colors flex items-center gap-1 ml-2">
-          Source<span>&gt;</span>
-        </button>
-      </a>
+          <button className="text-xs text-gray-400 group-hover:text-blue-300 active:text-blue-100 transition-colors flex items-center gap-1 ml-2">
+            Source<span>&gt;</span>
+          </button>
+        </a>
+      )}
     </div>
   )
 }

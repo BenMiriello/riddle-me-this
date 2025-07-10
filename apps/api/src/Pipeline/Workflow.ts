@@ -71,13 +71,18 @@ export class Workflow {
       executed.add(stepName)
     }
 
-    const finalSteps = executionOrder.filter((name) => {
-      return !Array.from(this.steps.keys()).some((otherStep) =>
-        this.dependencies.get(otherStep)?.includes(name)
-      )
-    })
+    // Return structured response with all step results
+    const structuredResponse: Record<string, unknown> = {}
 
-    return results.get(finalSteps[finalSteps.length - 1])
+    // Add input data as webRequest stage
+    structuredResponse.webRequest = initialInput
+
+    // Add all step results grouped by stage name
+    for (const [stepName, stepResult] of results.entries()) {
+      structuredResponse[stepName] = stepResult
+    }
+
+    return structuredResponse
   }
 
   private evaluateStringCondition(

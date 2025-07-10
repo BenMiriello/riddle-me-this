@@ -51,13 +51,13 @@ AVOID:
 
 CREATE ENIGMATIC RIDDLE (2-4 lines only):`,
 
-  concise: `Create riddle from answer. 2-4 lines only, no explanations.
+  concise: `Transform this answer into a riddle. DO NOT include "Here's a riddle" or any introductory text. Return ONLY the riddle lines.
 
 Answer: {answerToRiddlefy}
 
-Use "I am/have/can" format, metaphors, contradictions. Make it solvable but surprising.
+Use "I am/have/can" format, metaphors, contradictions. 2-4 lines maximum. Make it solvable but surprising.
 
-Riddle:`,
+Return the riddle lines only, nothing else:`,
 }
 
 export const qualityAssessmentPrompts: PromptConfig = {

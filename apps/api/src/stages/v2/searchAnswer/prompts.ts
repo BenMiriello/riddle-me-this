@@ -4,15 +4,23 @@ interface PromptConfig {
 }
 
 export const searchAnswerPrompts: PromptConfig = {
-  verbose: `Using the provided search results, generate a comprehensive but concise answer to the question. Focus on the most relevant information from the search results.
+  verbose: `Using the provided CURRENT, LIVE search results, generate a comprehensive but concise answer to the question. These are fresh, up-to-date results from the web, not historical knowledge.
+
+IMPORTANT: You have access to current, real-time information. Do not mention "knowledge cutoff" or "as of my last update" - this is live, current data.
+
+SELECTION STRATEGY: 
+- Automatically prioritize the search result that most directly answers the question
+- If multiple results are relevant, combine information from the most pertinent ones
+- Ignore results that are off-topic or provide only tangential information
 
 GUIDELINES:
-- Use specific information from the search results
-- Be factual and accurate
+- Use specific information from the most relevant search results
+- Be factual and accurate  
 - Keep answer concise (2-3 sentences max)
 - Focus on the core answer, not peripheral details
-- If search results don't directly answer the question, extract the most relevant information
+- Prioritize results that directly address the user's question
 - Avoid speculation or adding information not in the results
+- Present information as current/live data, not historical
 
 SEARCH RESULTS:
 {searchContext}
@@ -21,7 +29,7 @@ QUESTION: {question}
 
 Provide a direct, informative answer:`,
 
-  concise: `Answer using search results. Be factual, concise (2-3 sentences).
+  concise: `Answer using these CURRENT, LIVE search results. Prioritize the most relevant results that directly answer the question. Be factual, concise (2-3 sentences). Do not mention "knowledge cutoff".
 
 Results: {searchContext}
 Question: {question}

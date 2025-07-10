@@ -6,6 +6,8 @@ interface SearchAnswerInput {
   needsSearch: boolean
   processedInput: string
   riddleAnswer?: string
+  searchableAnswer?: string
+  userIntent: string
   inputType:
     | 'question'
     | 'url'
@@ -15,6 +17,8 @@ interface SearchAnswerInput {
     | 'descriptive'
     | 'transactional'
   coreContent: string
+  answerStrategy: 'singular' | 'multiple'
+  answerStrategyReasoning: string
   env: {
     AI: {
       run: (
@@ -34,6 +38,7 @@ interface SearchAnswerOutput {
   searchResults?: Array<{ title: string; snippet: string; link: string }>
   searchPerformed: boolean
   answerSource: 'search' | 'knowledge' | 'riddle_answer'
+  actualSearchQuery?: string
 }
 
 const searchAnswerStage = async (
@@ -59,12 +64,34 @@ const searchAnswerStage = async (
   }
 
   // Determine what to search for
-  const searchQuery =
-    input.inputType === 'url'
-      ? input.question // Use original URL for search
-      : input.coreContent // Use processed/distilled content
+  let searchQuery: string
+  if (input.inputType === 'url') {
+    searchQuery = input.question // Use original URL for search
+  } else if (input.isRiddle && input.searchableAnswer) {
+    searchQuery = input.searchableAnswer // Use context-preserved answer for search
+  } else if (input.isRiddle && input.riddleAnswer) {
+    searchQuery = input.riddleAnswer // Fallback to basic answer if no searchable answer
+  } else {
+    // Smart search query extraction for explicit search requests
+    const searchPatterns = [
+      /(?:search for|web search|look up|find information about|google)\s+(.+)/i,
+      /(?:what is|who is|where is|when is|how is)\s+(.+)/i,
+    ]
+
+    let extractedQuery = input.question
+    for (const pattern of searchPatterns) {
+      const match = input.question.match(pattern)
+      if (match && match[1]) {
+        extractedQuery = match[1].trim()
+        break
+      }
+    }
+
+    searchQuery = extractedQuery // Use extracted query or original question
+  }
 
   // Perform search if needed and API keys available
+
   if (
     input.needsSearch &&
     input.env.GOOGLE_SEARCH_API_KEY &&
@@ -76,6 +103,7 @@ const searchAnswerStage = async (
       const response = await fetch(searchUrl)
       const data = (await response.json()) as {
         items?: Array<{ title?: string; snippet?: string; link?: string }>
+        error?: { code: number; message: string }
       }
 
       if (data.items && data.items.length > 0) {
@@ -87,17 +115,26 @@ const searchAnswerStage = async (
         searchPerformed = true
         answerSource = 'search'
       }
-    } catch (error) {
-      console.log('Search error:', error)
+    } catch {
       searchPerformed = false
     }
   }
 
   // Generate answer based on available information
   if (searchPerformed && searchResults.length > 0) {
-    // Use search results to generate answer
-    const searchContext = searchResults
-      .slice(0, 2) // Use top 2 results
+    // Determine how many results to use based on strategy
+    let resultsToUse = searchResults
+
+    if (input.answerStrategy === 'singular') {
+      // For singular strategy, use only the best/first result
+      resultsToUse = searchResults.slice(0, 1)
+    } else {
+      // For multiple strategy, use top 2-3 results
+      resultsToUse = searchResults.slice(0, 2)
+    }
+
+    // Use selected results to generate answer
+    const searchContext = resultsToUse
       .map((result) => `${result.title}: ${result.snippet}`)
       .join('\n\n')
 
@@ -130,12 +167,22 @@ const searchAnswerStage = async (
     answerSource = 'knowledge'
   }
 
-  return {
+  const output = {
     answerContent,
     searchResults,
     searchPerformed,
     answerSource,
+    actualSearchQuery: searchQuery,
   }
+
+  console.log('SearchAnswer stage output:', {
+    searchPerformed: output.searchPerformed,
+    answerSource: output.answerSource,
+    actualSearchQuery: output.actualSearchQuery,
+    resultsCount: output.searchResults?.length || 0,
+  })
+
+  return output
 }
 
 export default searchAnswerStage

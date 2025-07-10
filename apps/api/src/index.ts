@@ -4,7 +4,12 @@ import originalWorkflow, {
   type WorkflowV1Input,
   type FinalOutput,
 } from './workflows/v1'
-import WorkflowV2, { type WorkflowV2Input } from './workflows/v2'
+import WorkflowV2, {
+  workflowV2Adapters,
+  type WorkflowV2Input,
+  type WorkflowV2Output,
+  type V2RiddleResponse,
+} from './workflows/v2'
 
 interface Env {
   AI: {
@@ -56,7 +61,7 @@ app.get('/health', (c) => {
   }
 })
 
-app.post('/riddle', async (c) => {
+app.post('/v1/riddle', async (c) => {
   try {
     const { question } = await c.req.json()
 
@@ -74,9 +79,10 @@ app.post('/riddle', async (c) => {
       },
     }
 
-    const result = (await originalWorkflow.execute(
-      workflowInput
-    )) as FinalOutput
+    const workflowResult = await originalWorkflow.execute(workflowInput)
+
+    // Extract final result from structured response
+    const result = (workflowResult as { final: FinalOutput }).final
 
     return c.json(result)
   } catch (error) {
@@ -85,7 +91,7 @@ app.post('/riddle', async (c) => {
   }
 })
 
-app.post('/riddle/v2', async (c) => {
+app.post('/v2/riddle', async (c) => {
   try {
     const { question } = await c.req.json()
 
@@ -104,9 +110,15 @@ app.post('/riddle/v2', async (c) => {
       },
     }
 
-    const result = await WorkflowV2.execute(workflowInput)
+    const workflowResult = (await WorkflowV2.execute(
+      workflowInput
+    )) as WorkflowV2Output
 
-    return c.json(result)
+    // Use adapter to transform to API format
+    const apiResponse: V2RiddleResponse =
+      workflowV2Adapters.toApiV2(workflowResult)
+
+    return c.json(apiResponse)
   } catch (error) {
     console.error('Error:', error)
     return c.json({ error: 'Failed to process question' }, 500)

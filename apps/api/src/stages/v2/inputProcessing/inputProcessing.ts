@@ -1,5 +1,6 @@
 interface InputProcessingInput {
   question: string
+  searchRequested?: boolean
   env: {
     AI: {
       run: (
@@ -20,6 +21,8 @@ interface InputProcessingOutput {
   processedInput: string
   riddleAnswer?: string
   riddleConfidence?: number
+  searchableAnswer?: string
+  userIntent: string
   inputType:
     | 'question'
     | 'url'
@@ -34,9 +37,21 @@ interface InputProcessingOutput {
     earned: boolean
     context?: string
   }>
+  evaluation: {
+    needsSearch: 'SEARCH' | 'NO_SEARCH'
+    riddleEval: {
+      hasRhyme: boolean
+      hasMetaphor: boolean
+      hasImplicitSubject: boolean
+      hasPlayfulLanguage: boolean
+      hasStructure: boolean
+    }
+  }
+  answerStrategy: 'singular' | 'multiple'
+  answerStrategyReasoning: string
 }
 
-import { comprehensiveProcessingPrompts } from './comprehensivePrompts'
+import { inputProcessingPrompts } from './prompts'
 
 const inputProcessingStage = async (
   input: InputProcessingInput
@@ -50,6 +65,8 @@ const inputProcessingStage = async (
   const processedInput = input.question
   let riddleAnswer: string | undefined
   let riddleConfidence: number | undefined
+  let searchableAnswer: string | undefined
+  let userIntent = 'General information seeking'
   let inputType:
     | 'question'
     | 'url'
@@ -60,14 +77,26 @@ const inputProcessingStage = async (
     | 'transactional' = 'question'
   let coreContent = input.question
   const badges: Array<{ type: string; earned: boolean; context?: string }> = []
+  let evaluation = {
+    needsSearch: 'NO_SEARCH' as 'SEARCH' | 'NO_SEARCH',
+    riddleEval: {
+      hasRhyme: false,
+      hasMetaphor: false,
+      hasImplicitSubject: false,
+      hasPlayfulLanguage: false,
+      hasStructure: false,
+    },
+  }
+  let answerStrategy: 'singular' | 'multiple' = 'multiple'
+  let answerStrategyReasoning = 'Default multiple answer approach'
 
   // Single comprehensive LLM call that handles everything
-  const comprehensivePrompt = comprehensiveProcessingPrompts[promptMode]
+  const inputPrompt = inputProcessingPrompts[promptMode]
 
   try {
     const response = await input.env.AI.run(model, {
       messages: [
-        { role: 'system', content: comprehensivePrompt },
+        { role: 'system', content: inputPrompt },
         { role: 'user', content: input.question },
       ],
     })
@@ -85,7 +114,11 @@ const inputProcessingStage = async (
     // Extract basic classification
     inputType = result.inputType || 'question'
     isRiddle = result.isRiddle || false
-    needsSearch = result.needsSearch || false
+
+    // Handle needsSearch: user requested OR system determined
+    const systemDeterminedSearch = result.needsSearch || false
+    needsSearch = input.searchRequested || systemDeterminedSearch
+
     coreContent = result.coreContent || input.question
 
     // Handle riddle analysis and solving
@@ -94,11 +127,33 @@ const inputProcessingStage = async (
       if (riddleConfidence && riddleConfidence >= 50) {
         isRiddle = true
         riddleAnswer = result.riddleAnalysis.answer
+        searchableAnswer = result.riddleAnalysis.searchableAnswer
+
+        // Fallback for missing searchableAnswer on weather queries
+        if (
+          !searchableAnswer &&
+          needsSearch &&
+          input.question.toLowerCase().includes('weather')
+        ) {
+          const locationMatch = input.question.match(
+            /in\s+([^?]+?)(?:\s+today|\s+now|$|\?)/i
+          )
+          if (locationMatch) {
+            const location = locationMatch[1].trim()
+            searchableAnswer = `weather in ${location}`
+          }
+        }
+
         // Use riddle answer as core content if solved
         if (riddleAnswer) {
           coreContent = riddleAnswer
         }
       }
+    }
+
+    // Extract user intent
+    if (result.userIntent) {
+      userIntent = result.userIntent
     }
 
     // Handle URL distillation
@@ -131,6 +186,32 @@ const inputProcessingStage = async (
         })
       })
     }
+
+    // Extract evaluation
+    if (result.evaluation) {
+      evaluation = {
+        needsSearch: result.evaluation.needsSearch || 'NO_SEARCH',
+        riddleEval: result.evaluation.riddleEval || evaluation.riddleEval,
+      }
+    }
+
+    // Extract answer strategy
+    if (result.answerStrategy) {
+      answerStrategy = result.answerStrategy
+      answerStrategyReasoning =
+        result.answerStrategyReasoning || 'No reasoning provided'
+      console.log(
+        'Strategy extracted from comprehensive prompt:',
+        answerStrategy,
+        '-',
+        answerStrategyReasoning
+      )
+    } else {
+      console.log(
+        'No answerStrategy found in result, using default:',
+        answerStrategy
+      )
+    }
   } catch (error) {
     console.log('Comprehensive processing error:', error)
 
@@ -149,7 +230,11 @@ const inputProcessingStage = async (
 
       const fallbackResult = JSON.parse(fallbackResponse.response)
       inputType = fallbackResult.inputType || 'question'
-      needsSearch = fallbackResult.needsSearch || false
+
+      // Handle needsSearch: user requested OR system determined
+      const systemDeterminedSearch = fallbackResult.needsSearch || false
+      needsSearch = input.searchRequested || systemDeterminedSearch
+
       isRiddle = fallbackResult.isRiddle || false
       coreContent = fallbackResult.coreContent || input.question
     } catch (fallbackError) {
@@ -157,21 +242,35 @@ const inputProcessingStage = async (
       // Final fallback to basic processing
       inputType = 'question'
       coreContent = input.question
-      needsSearch = false
+      needsSearch = input.searchRequested || false
       isRiddle = false
     }
   }
 
-  return {
+  const output = {
     isRiddle,
     needsSearch,
     processedInput,
     riddleAnswer,
     riddleConfidence,
+    searchableAnswer,
+    userIntent,
     inputType,
     coreContent,
     badges,
+    evaluation,
+    answerStrategy,
+    answerStrategyReasoning,
   }
+
+  console.log('InputProcessing stage output:', {
+    isRiddle: output.isRiddle,
+    needsSearch: output.needsSearch,
+    userIntent: output.userIntent,
+    searchableAnswer: output.searchableAnswer,
+  })
+
+  return output
 }
 
 export default inputProcessingStage

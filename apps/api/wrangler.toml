@@ -16,6 +16,7 @@ name = "riddle-me-this-api-dev"
 [env.development.vars]
 ENVIRONMENT = "development"
 GOOGLE_SEARCH_ENGINE_ID = "a61de03c6209d4c31"
+# GOOGLE_SEARCH_API_KEY should be set via: wrangler secret put GOOGLE_SEARCH_API_KEY
 
 [env.development.ai]
 binding = "AI"
@@ -27,6 +28,7 @@ name = "riddle-me-this-api"
 [env.production.vars]
 ENVIRONMENT = "production"
 GOOGLE_SEARCH_ENGINE_ID = "a61de03c6209d4c31"
+# GOOGLE_SEARCH_API_KEY should be set via: wrangler secret put GOOGLE_SEARCH_API_KEY --env production
 APP_VERSION = "0.0.1"  # Updated by deployment process
 
 [env.production.ai]
