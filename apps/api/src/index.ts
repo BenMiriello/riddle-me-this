@@ -10,6 +10,7 @@ import WorkflowV2, {
   type WorkflowV2Output,
   type V2RiddleResponse,
 } from './workflows/v2'
+import WorkflowV3, { type WorkflowV3Input } from './workflows/v3'
 
 interface Env {
   AI: {
@@ -55,6 +56,7 @@ app.get('/health', (c) => {
       gitSha: gitSha.substring(0, 7),
       buildTime: new Date().toISOString(),
       environment: environment,
+      models: { v3_default: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b' },
     })
   } catch (error) {
     return c.json({ error: 'Health check failed', details: String(error) }, 500)
@@ -91,6 +93,59 @@ app.post('/v1/riddle', async (c) => {
   }
 })
 
+// Unified riddle endpoint - supports all workflow versions
+app.post('/riddle', async (c) => {
+  try {
+    const { question, workflow = 'v3' } = await c.req.json()
+
+    if (!question) {
+      return c.json({ error: 'Question is required' }, 400)
+    }
+
+    const env = {
+      AI: c.env.AI,
+      GOOGLE_SEARCH_API_KEY: c.env.GOOGLE_SEARCH_API_KEY,
+      GOOGLE_SEARCH_ENGINE_ID: c.env.GOOGLE_SEARCH_ENGINE_ID,
+      AI_MODEL: c.env.AI_MODEL,
+      RIDDLE_PROMPT_MODE: c.env.RIDDLE_PROMPT_MODE,
+    }
+
+    switch (workflow) {
+      case 'v1': {
+        const workflowInput: WorkflowV1Input = { question, env }
+        const workflowResult = await originalWorkflow.execute(workflowInput)
+        const result = (workflowResult as { final: FinalOutput }).final
+        return c.json(result)
+      }
+
+      case 'v2': {
+        const workflowInput: WorkflowV2Input = { question, env }
+        const workflowResult = (await WorkflowV2.execute(
+          workflowInput
+        )) as WorkflowV2Output
+        const apiResponse: V2RiddleResponse =
+          workflowV2Adapters.toApiV2(workflowResult)
+        return c.json(apiResponse)
+      }
+
+      case 'v3': {
+        const workflowInput: WorkflowV3Input = { question, env }
+        const result = await WorkflowV3.execute(workflowInput)
+        return c.json(result)
+      }
+
+      default:
+        return c.json(
+          { error: 'Invalid workflow version. Use v1, v2, or v3' },
+          400
+        )
+    }
+  } catch (error) {
+    console.error('Workflow error:', error)
+    return c.json({ error: 'Internal server error' }, 500)
+  }
+})
+
 app.post('/v2/riddle', async (c) => {
   try {
     const { question } = await c.req.json()
@@ -121,6 +176,35 @@ app.post('/v2/riddle', async (c) => {
     return c.json(apiResponse)
   } catch (error) {
     console.error('Error:', error)
+    return c.json({ error: 'Failed to process question' }, 500)
+  }
+})
+
+// Legacy V3 endpoint (kept for backward compatibility)
+app.post('/v3/riddle', async (c) => {
+  try {
+    const { question } = await c.req.json()
+
+    if (!question) {
+      return c.json({ error: 'Question is required' }, 400)
+    }
+
+    const workflowInput: WorkflowV3Input = {
+      question,
+      env: {
+        AI: c.env.AI,
+        GOOGLE_SEARCH_API_KEY: c.env.GOOGLE_SEARCH_API_KEY,
+        GOOGLE_SEARCH_ENGINE_ID: c.env.GOOGLE_SEARCH_ENGINE_ID,
+        AI_MODEL: c.env.AI_MODEL,
+        RIDDLE_PROMPT_MODE: c.env.RIDDLE_PROMPT_MODE,
+      },
+    }
+
+    const result = await WorkflowV3.execute(workflowInput)
+
+    return c.json(result)
+  } catch (error) {
+    console.error('V3 Error:', error)
     return c.json({ error: 'Failed to process question' }, 500)
   }
 })

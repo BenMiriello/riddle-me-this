@@ -1,6 +1,25 @@
 import { Workflow } from './Workflow'
 import { isReservedKeyword } from './utils'
 
+// Yield point interfaces
+export interface YieldPoint<TInput, TOutput> {
+  (data: TInput): YieldResponse<TOutput>
+}
+
+export interface YieldResponse<TOutput> {
+  nextStep?: string
+  actionWord?: string
+  completedAction?: string
+  customData?: TOutput
+}
+
+export interface YieldStep {
+  yieldFn: YieldPoint<any, any>
+  options?: {
+    after?: string[]
+  }
+}
+
 // Stage interface with known input/output
 export interface Stage<TInput, TOutput> {
   (input: TInput): TOutput | Promise<TOutput>
@@ -14,7 +33,9 @@ type PipelineConflicts = 'last' | 'result'
 type ReservedWords = keyof typeof Object.prototype | PipelineConflicts
 
 // Validate step name isn't reserved (compile-time check)
-type ValidStepName<T extends string> = T extends ReservedWords ? never : T
+export type ValidStepName<T extends string> = T extends ReservedWords
+  ? never
+  : T
 
 // Runtime validation for step names
 function validateStepName(name: string): void {
@@ -95,6 +116,8 @@ export class PipelineBuilder<TSteps extends Record<string, any> = {}> {
   private dependencies: Map<string, string[]> = new Map()
   private stepOrder: string[] = []
   private outputProperties: Set<string> = new Set()
+  private yields: Map<string, YieldStep> = new Map()
+  private yieldOrder: string[] = []
 
   step<TName extends string, TInput, TOutput>(
     name: ValidStepName<TName> extends never
@@ -215,11 +238,39 @@ export class PipelineBuilder<TSteps extends Record<string, any> = {}> {
     return this as any
   }
 
+  // Add yield functionality to unified builder
+  yield<TName extends string, TInput, TOutput>(
+    name: ValidStepName<TName> extends never
+      ? never
+      : TName extends StepNames<TSteps>
+        ? never
+        : TName,
+    yieldFn: YieldPoint<TInput, TOutput>,
+    options?: { after?: string[] }
+  ): PipelineBuilder<TSteps & Record<TName, TOutput>> {
+    // Runtime validation for yield name
+    if (this.yields.has(name as string)) {
+      throw new Error(`Yield point '${name}' is already defined`)
+    }
+
+    this.yields.set(name as string, { yieldFn, options })
+    this.yieldOrder.push(name as string)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return this as any
+  }
+
   build(): Workflow {
     // Validate no circular dependencies
     this.validateNoCycles()
 
-    return new Workflow(this.steps, this.dependencies)
+    // Always return unified Workflow (handles both simple and yielding execution)
+    return new Workflow(
+      this.steps,
+      this.dependencies,
+      this.yields,
+      this.yieldOrder
+    )
   }
 
   private validateNoCycles(): void {

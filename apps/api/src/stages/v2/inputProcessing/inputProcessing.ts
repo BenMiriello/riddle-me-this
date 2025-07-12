@@ -1,6 +1,7 @@
 interface InputProcessingInput {
   question: string
   searchRequested?: boolean
+  workflowVersion?: 'v2' | 'v3'
   env: {
     AI: {
       run: (
@@ -11,6 +12,7 @@ interface InputProcessingInput {
     GOOGLE_SEARCH_API_KEY?: string
     GOOGLE_SEARCH_ENGINE_ID?: string
     AI_MODEL?: string
+    AI_MODEL_USES_THINKING?: boolean
     RIDDLE_PROMPT_MODE?: 'verbose' | 'concise'
   }
 }
@@ -46,6 +48,11 @@ interface InputProcessingOutput {
       hasPlayfulLanguage: boolean
       hasStructure: boolean
     }
+  }
+  actionWords?: {
+    presentTense: string
+    pastTense: string
+    reasoning?: string
   }
   answerStrategy: 'singular' | 'multiple'
   answerStrategyReasoning: string
@@ -89,9 +96,13 @@ const inputProcessingStage = async (
   }
   let answerStrategy: 'singular' | 'multiple' = 'multiple'
   let answerStrategyReasoning = 'Default multiple answer approach'
+  let actionWords:
+    | { presentTense: string; pastTense: string; reasoning?: string }
+    | undefined
 
   // Single comprehensive LLM call that handles everything
-  const inputPrompt = inputProcessingPrompts[promptMode]
+  const prompts = inputProcessingPrompts(input.workflowVersion || 'v2')
+  const inputPrompt = prompts[promptMode]
 
   try {
     const response = await input.env.AI.run(model, {
@@ -103,11 +114,199 @@ const inputProcessingStage = async (
 
     let responseText = response.response.trim()
 
-    // Try to extract JSON if there's extra text
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/)
-    if (jsonMatch) {
-      responseText = jsonMatch[0]
+    // Enhanced cleaning for DeepSeek thinking tags based on research findings
+    console.log(
+      '🔧 AI_MODEL_USES_THINKING:',
+      input.env.AI_MODEL_USES_THINKING,
+      'Model:',
+      input.env.AI_MODEL
+    )
+    console.log(
+      '🔧 Raw response length:',
+      responseText.length,
+      'starts with:',
+      responseText.substring(0, 50)
+    )
+    console.log(
+      '🔧 Response ends with:',
+      responseText.substring(responseText.length - 50)
+    )
+    console.log('🔧 Contains </think>:', responseText.includes('</think>'))
+    console.log(
+      '🔧 Think tag count - open:',
+      (responseText.match(/<think>/g) || []).length,
+      'close:',
+      (responseText.match(/<\/think>/g) || []).length
+    )
+
+    let jsonContent = null
+
+    // Method 1: Handle nested <think> tags by finding the last closing tag
+    const lastThinkClose = responseText.lastIndexOf('</think>')
+    if (lastThinkClose !== -1) {
+      // Extract everything after the last </think> tag
+      const afterThinkTags = responseText.substring(lastThinkClose + 8).trim()
+      console.log(
+        '🔧 Content after last </think>:',
+        afterThinkTags.substring(0, 100)
+      )
+
+      if (afterThinkTags) {
+        // Remove markdown code blocks first
+        const cleanAfterThink = afterThinkTags
+          .replace(/```json\s*/gi, '')
+          .replace(/```\s*$/gm, '')
+          .trim()
+
+        console.log(
+          '🔧 After removing markdown:',
+          cleanAfterThink.substring(0, 100)
+        )
+
+        // Look for JSON in cleaned content
+        const jsonMatch = cleanAfterThink.match(/\{[\s\S]*?\}/s)
+        if (jsonMatch) {
+          jsonContent = jsonMatch[0]
+          console.log(
+            '🔧 Method 1 - Found JSON after think tags (markdown cleaned)'
+          )
+        }
+      }
     }
+
+    // Method 2: If no JSON after tags, look inside the last think block
+    if (!jsonContent) {
+      // Find all think blocks including nested ones
+      const allThinkMatches = [
+        ...responseText.matchAll(/<think>([\s\S]*?)(?=<\/think>|$)/gi),
+      ]
+
+      if (allThinkMatches.length > 0) {
+        // Check the last (outermost) think block for JSON
+        const lastThinkContent = allThinkMatches[allThinkMatches.length - 1][1]
+        console.log('🔧 Last think content length:', lastThinkContent.length)
+
+        const jsonMatch = lastThinkContent.match(/\{[\s\S]*?\}/s)
+        if (jsonMatch) {
+          jsonContent = jsonMatch[0]
+          console.log('🔧 Method 2 - Found JSON inside think tags')
+        }
+      }
+    }
+
+    // Method 3: Remove all thinking tags and extract JSON
+    if (!jsonContent) {
+      console.log('🔧 Method 3 - Fallback to removing all think tags')
+
+      let cleanText = responseText
+      // Remove all think tags (handles nested)
+      cleanText = cleanText.replace(/<\/?think[^>]*>/gi, '').trim()
+
+      // Remove markdown code blocks
+      cleanText = cleanText
+        .replace(/```json\s*/gi, '')
+        .replace(/```\s*$/gm, '')
+        .trim()
+      cleanText = cleanText.replace(/^```.*$/gm, '').trim()
+
+      // Remove trailing newlines and whitespace (Cloudflare Workers AI issue)
+      cleanText = cleanText.replace(/\n+$/, '').trim()
+
+      // Extract first complete JSON object
+      const jsonMatch = cleanText.match(/\{[\s\S]*?\}/s)
+      if (jsonMatch) {
+        jsonContent = jsonMatch[0]
+        console.log('🔧 Method 3 - Found JSON after cleaning')
+      }
+    }
+
+    // Method 4: Handle unclosed think tags - look for JSON patterns anywhere
+    if (!jsonContent) {
+      console.log(
+        '🔧 Method 4 - Looking for JSON patterns anywhere in response (unclosed think tags)'
+      )
+
+      // Look for JSON wrapped in markdown first
+      const markdownJsonMatch = responseText.match(
+        /```json\s*(\{[\s\S]*?\})\s*```/s
+      )
+      if (markdownJsonMatch) {
+        jsonContent = markdownJsonMatch[1]
+        console.log('🔧 Method 4 - Found markdown-wrapped JSON')
+      } else {
+        // Look for any JSON object pattern
+        const anyJsonMatch = responseText.match(
+          /\{[\s\S]*?"inputType"[\s\S]*?\}/s
+        )
+        if (anyJsonMatch) {
+          jsonContent = anyJsonMatch[0]
+          console.log('🔧 Method 4 - Found JSON pattern with inputType')
+        }
+      }
+    }
+
+    // Method 5: Handle unclosed think tags with partial JSON at end
+    if (!jsonContent) {
+      const openThinkCount = (responseText.match(/<think>/g) || []).length
+      const closeThinkCount = (responseText.match(/<\/think>/g) || []).length
+
+      if (openThinkCount > closeThinkCount) {
+        console.log(
+          '🔧 Method 5 - Handling unclosed think tags, extracting content after <think>'
+        )
+
+        // Find the last <think> tag and extract everything after it
+        const lastThinkIndex = responseText.lastIndexOf('<think>')
+        if (lastThinkIndex !== -1) {
+          const afterThink = responseText.substring(lastThinkIndex + 7).trim()
+          console.log(
+            '🔧 Content after last <think>:',
+            afterThink.substring(0, 200)
+          )
+
+          // Try to find any structured content that looks like JSON fields
+          // Look for patterns like: "inputType": "question", "isRiddle": false, etc.
+          const fieldPattern = /"?\w+"?\s*:\s*(?:"[^"]*"|true|false|\d+)/g
+          const fields = afterThink.match(fieldPattern)
+
+          if (fields && fields.length >= 3) {
+            // Try to construct valid JSON from field patterns
+            const jsonStr = '{' + fields.join(', ') + '}'
+            console.log(
+              '🔧 Constructed JSON from fields:',
+              jsonStr.substring(0, 200)
+            )
+
+            try {
+              JSON.parse(jsonStr) // Test if it's valid
+              jsonContent = jsonStr
+              console.log(
+                '🔧 Method 5 - Successfully constructed JSON from field patterns'
+              )
+            } catch {
+              console.log(
+                '🔧 Method 5 - Constructed JSON is invalid, trying direct extraction'
+              )
+
+              // Fallback: look for any JSON-like structure in the remaining content
+              const jsonMatch = afterThink.match(/\{[\s\S]*?\}/s)
+              if (jsonMatch) {
+                jsonContent = jsonMatch[0]
+                console.log('🔧 Method 5 - Found JSON pattern after <think>')
+              }
+            }
+          }
+        }
+      }
+    }
+
+    responseText = jsonContent || responseText
+    console.log(
+      '🔧 Final JSON length:',
+      responseText.length,
+      'starts with:',
+      responseText.substring(0, 50)
+    )
 
     const result = JSON.parse(responseText)
 
@@ -154,6 +353,15 @@ const inputProcessingStage = async (
     // Extract user intent
     if (result.userIntent) {
       userIntent = result.userIntent
+    }
+
+    // Extract action words from LLM response
+    if (result.actionWords) {
+      actionWords = {
+        presentTense: result.actionWords.presentTense || 'processing',
+        pastTense: result.actionWords.pastTense || 'processed',
+        reasoning: result.actionWords.reasoning,
+      }
     }
 
     // Handle URL distillation
@@ -228,7 +436,184 @@ const inputProcessingStage = async (
         ],
       })
 
-      const fallbackResult = JSON.parse(fallbackResponse.response)
+      // Enhanced fallback cleaning (same logic as main processing)
+      let fallbackText = fallbackResponse.response.trim()
+      console.log(
+        '🔧 Fallback raw length:',
+        fallbackText.length,
+        'starts with:',
+        fallbackText.substring(0, 50)
+      )
+
+      let fallbackJsonContent = null
+
+      // Method 1: Handle nested <think> tags by finding the last closing tag
+      const lastThinkClose = fallbackText.lastIndexOf('</think>')
+      if (lastThinkClose !== -1) {
+        const afterThinkTags = fallbackText.substring(lastThinkClose + 8).trim()
+        console.log(
+          '🔧 Fallback content after last </think>:',
+          afterThinkTags.substring(0, 100)
+        )
+
+        if (afterThinkTags) {
+          // Remove markdown code blocks first
+          const cleanAfterThink = afterThinkTags
+            .replace(/```json\s*/gi, '')
+            .replace(/```\s*$/gm, '')
+            .trim()
+
+          console.log(
+            '🔧 Fallback after removing markdown:',
+            cleanAfterThink.substring(0, 100)
+          )
+
+          // Look for JSON in cleaned content
+          const jsonMatch = cleanAfterThink.match(/\{[\s\S]*?\}/s)
+          if (jsonMatch) {
+            fallbackJsonContent = jsonMatch[0]
+            console.log(
+              '🔧 Fallback Method 1 - Found JSON after think tags (markdown cleaned)'
+            )
+          }
+        }
+      }
+
+      // Method 2: If no JSON after tags, look inside the last think block
+      if (!fallbackJsonContent) {
+        const allThinkMatches = [
+          ...fallbackText.matchAll(/<think>([\s\S]*?)(?=<\/think>|$)/gi),
+        ]
+
+        if (allThinkMatches.length > 0) {
+          const lastThinkContent =
+            allThinkMatches[allThinkMatches.length - 1][1]
+          console.log(
+            '🔧 Fallback last think content length:',
+            lastThinkContent.length
+          )
+
+          const jsonMatch = lastThinkContent.match(/\{[\s\S]*?\}/s)
+          if (jsonMatch) {
+            fallbackJsonContent = jsonMatch[0]
+            console.log('🔧 Fallback Method 2 - Found JSON inside think tags')
+          }
+        }
+      }
+
+      // Method 3: Remove all thinking tags and extract JSON
+      if (!fallbackJsonContent) {
+        console.log('🔧 Fallback Method 3 - Removing all think tags')
+
+        let cleanText = fallbackText
+        cleanText = cleanText.replace(/<\/?think[^>]*>/gi, '').trim()
+        cleanText = cleanText
+          .replace(/```json\s*/gi, '')
+          .replace(/```\s*$/gm, '')
+          .trim()
+        cleanText = cleanText.replace(/^```.*$/gm, '').trim()
+        cleanText = cleanText.replace(/\n+$/, '').trim()
+
+        const jsonMatch = cleanText.match(/\{[\s\S]*?\}/s)
+        if (jsonMatch) {
+          fallbackJsonContent = jsonMatch[0]
+          console.log('🔧 Fallback Method 3 - Found JSON after cleaning')
+        }
+      }
+
+      // Method 4: Handle unclosed think tags - look for JSON patterns anywhere
+      if (!fallbackJsonContent) {
+        console.log(
+          '🔧 Fallback Method 4 - Looking for JSON patterns anywhere in response'
+        )
+
+        // Look for JSON wrapped in markdown first
+        const markdownJsonMatch = fallbackText.match(
+          /```json\s*(\{[\s\S]*?\})\s*```/s
+        )
+        if (markdownJsonMatch) {
+          fallbackJsonContent = markdownJsonMatch[1]
+          console.log('🔧 Fallback Method 4 - Found markdown-wrapped JSON')
+        } else {
+          // Look for any JSON object pattern
+          const anyJsonMatch = fallbackText.match(
+            /\{[\s\S]*?"inputType"[\s\S]*?\}/s
+          )
+          if (anyJsonMatch) {
+            fallbackJsonContent = anyJsonMatch[0]
+            console.log(
+              '🔧 Fallback Method 4 - Found JSON pattern with inputType'
+            )
+          }
+        }
+      }
+
+      // Method 5: Handle unclosed think tags with partial JSON at end
+      if (!fallbackJsonContent) {
+        const openThinkCount = (fallbackText.match(/<think>/g) || []).length
+        const closeThinkCount = (fallbackText.match(/<\/think>/g) || []).length
+
+        if (openThinkCount > closeThinkCount) {
+          console.log(
+            '🔧 Fallback Method 5 - Handling unclosed think tags, extracting content after <think>'
+          )
+
+          // Find the last <think> tag and extract everything after it
+          const lastThinkIndex = fallbackText.lastIndexOf('<think>')
+          if (lastThinkIndex !== -1) {
+            const afterThink = fallbackText.substring(lastThinkIndex + 7).trim()
+            console.log(
+              '🔧 Fallback content after last <think>:',
+              afterThink.substring(0, 200)
+            )
+
+            // Try to find any structured content that looks like JSON fields
+            const fieldPattern = /"?\w+"?\s*:\s*(?:"[^"]*"|true|false|\d+)/g
+            const fields = afterThink.match(fieldPattern)
+
+            if (fields && fields.length >= 3) {
+              // Try to construct valid JSON from field patterns
+              const jsonStr = '{' + fields.join(', ') + '}'
+              console.log(
+                '🔧 Fallback constructed JSON from fields:',
+                jsonStr.substring(0, 200)
+              )
+
+              try {
+                JSON.parse(jsonStr) // Test if it's valid
+                fallbackJsonContent = jsonStr
+                console.log(
+                  '🔧 Fallback Method 5 - Successfully constructed JSON from field patterns'
+                )
+              } catch {
+                console.log(
+                  '🔧 Fallback Method 5 - Constructed JSON is invalid, trying direct extraction'
+                )
+
+                // Fallback: look for any JSON-like structure in the remaining content
+                const jsonMatch = afterThink.match(/\{[\s\S]*?\}/s)
+                if (jsonMatch) {
+                  fallbackJsonContent = jsonMatch[0]
+                  console.log(
+                    '🔧 Fallback Method 5 - Found JSON pattern after <think>'
+                  )
+                }
+              }
+            }
+          }
+        }
+      }
+
+      fallbackText = fallbackJsonContent || fallbackText
+      console.log(
+        '🔧 Fallback after cleaning length:',
+        fallbackText.length,
+        'starts with:',
+        fallbackText.substring(0, 50)
+      )
+
+      console.log('🔧 Fallback cleaned text:', fallbackText.substring(0, 200))
+      const fallbackResult = JSON.parse(fallbackText)
       inputType = fallbackResult.inputType || 'question'
 
       // Handle needsSearch: user requested OR system determined
@@ -261,6 +646,7 @@ const inputProcessingStage = async (
     evaluation,
     answerStrategy,
     answerStrategyReasoning,
+    actionWords,
   }
 
   console.log('InputProcessing stage output:', {

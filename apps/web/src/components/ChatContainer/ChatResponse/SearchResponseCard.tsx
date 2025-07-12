@@ -1,5 +1,18 @@
 import { useState } from 'react'
 
+// Load Macondo font
+const fontLink = document.createElement('link')
+fontLink.href = 'https://fonts.googleapis.com/css2?family=Macondo&display=swap'
+fontLink.rel = 'stylesheet'
+if (!document.head.querySelector('link[href*="Macondo"]')) {
+  document.head.appendChild(fontLink)
+}
+
+const responseTextStyle = {
+  fontFamily: 'Macondo, cursive',
+  letterSpacing: '0.025em',
+}
+
 interface SourceType {
   title: string
   snippet: string
@@ -9,14 +22,12 @@ interface SourceType {
 interface SearchResponseCardProps {
   response: string
   isTyping: boolean
-  loadingDots: string
   primarySource: SourceType | null
 }
 
 const SearchResponseCard = ({
   response,
   isTyping,
-  loadingDots,
   primarySource,
 }: SearchResponseCardProps) => {
   const [showSourceUrl, setShowSourceUrl] = useState(false)
@@ -66,8 +77,8 @@ const SearchResponseCard = ({
 
   return (
     <div className="bg-gray-700 rounded-lg border border-gray-600 p-3 relative">
-      <div className="text-white text-sm mb-2">
-        {response || loadingDots}
+      <div className="text-white text-lg mb-2" style={responseTextStyle}>
+        {response}
         {isTyping && response && <span className="animate-pulse">|</span>}
       </div>
 

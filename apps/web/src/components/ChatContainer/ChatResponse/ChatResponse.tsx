@@ -1,5 +1,17 @@
-import { useState, useEffect } from 'react'
+import React from 'react'
 import SearchResponseCard from './SearchResponseCard'
+
+// Load Macondo font
+const fontLink = document.createElement('link')
+fontLink.href = 'https://fonts.googleapis.com/css2?family=Macondo&display=swap'
+fontLink.rel = 'stylesheet'
+if (!document.head.querySelector('link[href*="Macondo"]')) {
+  document.head.appendChild(fontLink)
+}
+
+const responseTextStyle = {
+  fontFamily: 'Macondo, cursive',
+}
 
 interface SourceType {
   title: string
@@ -28,22 +40,6 @@ const ChatResponse = ({
   primarySource,
   riddles,
 }: ChatResponseProps) => {
-  const [loadingDots, setLoadingDots] = useState('.')
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout
-    if (isTyping && response === '') {
-      interval = setInterval(() => {
-        setLoadingDots((prev) => {
-          if (prev === '.') return '..'
-          if (prev === '..') return '...'
-          return '.'
-        })
-      }, 500)
-    }
-    return () => clearInterval(interval)
-  }, [isTyping, response])
-
   // If we have multiple riddles, display them as separate cards
   if (riddles && riddles.length > 1) {
     return (
@@ -53,7 +49,6 @@ const ChatResponse = ({
             key={index}
             response={riddle.finalResponse}
             isTyping={index === 0 ? isTyping : false}
-            loadingDots={index === 0 ? loadingDots : ''}
             primarySource={riddle.sourceResult || null}
           />
         ))}
@@ -66,15 +61,14 @@ const ChatResponse = ({
       <SearchResponseCard
         response={response}
         isTyping={isTyping}
-        loadingDots={loadingDots}
         primarySource={primarySource}
       />
     )
   }
 
   return (
-    <div className="text-white text-sm">
-      {response || loadingDots}
+    <div className="text-white text-lg" style={responseTextStyle}>
+      {response}
       {isTyping && response && <span className="animate-pulse">|</span>}
     </div>
   )

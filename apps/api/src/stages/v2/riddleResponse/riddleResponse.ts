@@ -33,6 +33,7 @@ interface RiddleResponseInput {
       ) => Promise<{ response: string }>
     }
     AI_MODEL?: string
+    AI_MODEL_USES_THINKING?: boolean
     RIDDLE_PROMPT_MODE?: 'verbose' | 'concise'
   }
 }

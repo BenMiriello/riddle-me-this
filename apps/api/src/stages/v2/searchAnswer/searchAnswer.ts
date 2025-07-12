@@ -29,6 +29,7 @@ interface SearchAnswerInput {
     GOOGLE_SEARCH_API_KEY?: string
     GOOGLE_SEARCH_ENGINE_ID?: string
     AI_MODEL?: string
+    AI_MODEL_USES_THINKING?: boolean
     RIDDLE_PROMPT_MODE?: 'verbose' | 'concise'
   }
 }

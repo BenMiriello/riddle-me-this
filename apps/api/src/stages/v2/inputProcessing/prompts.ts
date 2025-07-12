@@ -1,10 +1,15 @@
-interface PromptConfig {
-  verbose: string
-  concise: string
+interface PromptConfigParams {
+  verbose: boolean
+  version: 'v2' | 'v3'
 }
 
-export const inputProcessingPrompts: PromptConfig = {
-  verbose: `You must respond with valid JSON only. No explanations, no text before or after. Analyze this input and respond with EXACTLY this JSON format:
+const basePrompts = ({ verbose, version = 'v2' }: PromptConfigParams) => {
+  if (verbose)
+    return `CRITICAL: You MUST respond with valid JSON only. NO THINKING. NO EXPLANATIONS. NO TEXT BEFORE OR AFTER JSON. 
+
+If you start thinking, STOP and output JSON immediately.
+
+Analyze this input and respond with EXACTLY this JSON format:
 
 {
   "inputType": "question" | "url" | "procedural" | "numerical" | "comparative" | "descriptive" | "transactional",
@@ -49,6 +54,15 @@ export const inputProcessingPrompts: PromptConfig = {
     "extractionMethod": "main_subject|key_action|primary_object|central_theme",
     "riddleability": 0-100,
     "alternatives": ["backup", "concepts"]
+  }${
+    version === 'v3'
+      ? `,
+  "actionWords": {
+    "presentTense": "contextual present-tense action verb for next step",
+    "pastTense": "contextual past-tense action verb for what was completed",
+    "reasoning": "brief explanation of why these verbs fit the context"
+  }`
+      : ''
   }
 }
 
@@ -128,9 +142,26 @@ CORE CONTENT PRIORITY:
 3. If complex: use distilled concept  
 4. Otherwise: use original input
 
-CRITICAL: Respond with ONLY the JSON object. No text before or after. No explanations. ALL fields must be populated with valid values.`,
+${
+  version === 'v3'
+    ? `ACTION WORD GENERATION:
+Generate contextual action verbs that relate to the specific question/input:
+- Present tense: Action for next step (e.g., "deciphering puzzle", "analyzing data", "investigating mystery")
+- Past tense: Action completed (e.g., "deciphered puzzle", "analyzed data", "investigated mystery")
+- Choose verbs that match the content type:
+  * Riddles: deciphering, unraveling, solving, contemplating, pondering
+  * Technical: analyzing, processing, computing, calculating, evaluating
+  * Search: investigating, exploring, researching, discovering, uncovering
+  * URLs: inspecting, navigating, exploring, reviewing, scanning
+  * Complex: deliberating, synthesizing, interpreting, parsing, distilling
 
-  concise: `ONLY JSON response. Analyze input comprehensively:
+`
+    : ''
+}CRITICAL: Respond with ONLY the JSON object. No text before or after. No explanations. ALL fields must be populated with valid values.`
+
+  return `CRITICAL: ONLY JSON response. NO THINKING. NO EXPLANATIONS. Output JSON immediately.
+
+Analyze input comprehensively:
   
 ANSWER STRATEGY: 
 - singular: factual lookups (weather, definitions, specific data)
@@ -159,6 +190,15 @@ ANSWER STRATEGY:
   "complexDistillation": {
     "extractionMethod": "method",
     "riddleability": 0-100
+  }${
+    version === 'v3'
+      ? `,
+  "actionWords": {
+    "presentTense": "contextual present-tense action verb",
+    "pastTense": "contextual past-tense action verb",
+    "reasoning": "brief explanation"
+  }`
+      : ''
   }
 }
 
@@ -171,5 +211,16 @@ Complex: distill to concrete, familiar element
 
 Badges: riddle_asked, first_search, chaos_wrangler, link_detective, procedural_master, riddle_solver, tree_stump, sphinx_equal
 
-CRITICAL: ONLY valid JSON. No text before/after.`,
+${
+  version === 'v3'
+    ? `Action Words: Generate contextual verbs for the input. Present tense for next step, past tense for completed action. Match content type (riddles: deciphering/solving, technical: analyzing/processing, search: investigating/exploring).
+
+`
+    : ''
+}CRITICAL: ONLY valid JSON. NO THINKING. NO EXPLANATIONS. Output JSON immediately. No text before/after.`
 }
+
+export const inputProcessingPrompts = (version: 'v2' | 'v3' = 'v2') => ({
+  verbose: basePrompts({ verbose: true, version }),
+  concise: basePrompts({ verbose: false, version }),
+})
