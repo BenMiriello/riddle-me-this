@@ -84,7 +84,7 @@ const workflowV2Adapters = {
     searchResults: result.searchAnswer?.searchResults || [],
     primarySource: result.searchAnswer?.searchResults?.[0] || null,
     badges: result.riddleResponse?.badges || [],
-    evaluation: result.inputProcessing?.evaluation?.needsSearch || 'NO_SEARCH',
+    evaluation: result.inputProcessing?.needsSearch ? 'SEARCH' : 'NO_SEARCH',
 
     // V2 enhancements
     riddles: result.riddleResponse?.riddles || null,
