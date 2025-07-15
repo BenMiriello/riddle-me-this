@@ -18,7 +18,6 @@ interface SearchAnswerInput {
     | 'transactional'
   coreContent: string
   answerStrategy: 'singular' | 'multiple'
-  answerStrategyReasoning: string
   env: {
     AI: {
       run: (

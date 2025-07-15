@@ -3,67 +3,28 @@ interface PromptConfigParams {
   version: 'v2' | 'v3'
 }
 
-const basePrompts = ({ verbose, version = 'v2' }: PromptConfigParams) => {
+const basePrompts = ({ verbose }: PromptConfigParams) => {
   if (verbose)
-    return `CRITICAL: You MUST respond with valid JSON only. NO THINKING. NO EXPLANATIONS. NO TEXT BEFORE OR AFTER JSON. 
+    return `You are a JSON-only response system. Your output will be parsed with JSON.parse() so it MUST be valid JSON.
 
-If you start thinking, STOP and output JSON immediately.
+Rules:
+1. ONLY output valid JSON - no text before/after
+2. NO explanations, NO thinking, NO markdown
+3. Use the EXACT format shown below
+4. Replace values but keep structure identical
 
-Analyze this input and respond with EXACTLY this JSON format:
+JSON Response Format:
 
 {
-  "inputType": "question" | "url" | "procedural" | "numerical" | "comparative" | "descriptive" | "transactional",
+  "inputType": "question",
   "isRiddle": boolean,
   "needsSearch": boolean,
   "coreContent": "extracted main concept or topic",
-  "riddleAnalysis": {
-    "hasPersonification": boolean,
-    "hasMetaphor": boolean,
-    "hasQuestionFormat": boolean,
-    "hasDescriptiveClues": boolean,
-    "confidence": 0-100,
-    "answer": "riddle answer if confidence >= 50, null otherwise",
-    "searchableAnswer": "riddle answer with original context preserved for search (location, time, etc.) if confidence >= 50, null otherwise",
-    "reasoning": "brief explanation if riddle solved"
-  },
-  "searchAnalysis": {
-    "requiresCurrentData": boolean,
-    "isSpecificQuery": boolean,
-    "reason": "brief explanation"
-  },
-  "badges": ["riddle_asked", "first_search", "chaos_wrangler", "link_detective", "procedural_master", "riddle_solver", "tree_stump", "sphinx_equal"],
-  "evaluation": {
-    "needsSearch": "SEARCH" | "NO_SEARCH",
-    "riddleEval": {
-      "hasRhyme": boolean,
-      "hasMetaphor": boolean,
-      "hasImplicitSubject": boolean,
-      "hasPlayfulLanguage": boolean,
-      "hasStructure": boolean
-    }
-  },
-  "answerStrategy": "singular" | "multiple",
-  "answerStrategyReasoning": "brief explanation of why singular or multiple answer approach is needed",
-  "userIntent": "open-ended description of what the user is trying to accomplish, based on the input and any riddle answer",
-  "urlDistillation": {
-    "conceptType": "website|search_engine|social_platform|marketplace|service|content_platform",
-    "riddleability": 0-100,
-    "searchQuery": "optimized search query for URL"
-  },
-  "complexDistillation": {
-    "extractionMethod": "main_subject|key_action|primary_object|central_theme",
-    "riddleability": 0-100,
-    "alternatives": ["backup", "concepts"]
-  }${
-    version === 'v3'
-      ? `,
-  "actionWords": {
-    "presentTense": "contextual present-tense action verb for next step",
-    "pastTense": "contextual past-tense action verb for what was completed",
-    "reasoning": "brief explanation of why these verbs fit the context"
-  }`
-      : ''
-  }
+  "riddleAnswer": "riddle answer if confidence >= 50, null otherwise",
+  "searchableAnswer": "riddle answer with original context preserved for search, null otherwise",
+  "userIntent": "what the user is trying to accomplish",
+  "answerStrategy": "multiple",
+  "badges": ["riddle_asked", "first_search", "chaos_wrangler", "link_detective", "procedural_master", "riddle_solver", "tree_stump", "sphinx_equal"]
 }
 
 COMPREHENSIVE ANALYSIS INSTRUCTIONS:
@@ -120,7 +81,7 @@ URL PROCESSING (if inputType is "url"):
 - Rate riddleability (0-100) - prefer actions/functions over abstract concepts
 - Generate search query for actual URL content
 
-COMPLEX INPUT DISTILLATION (if inputType is "procedural|comparative|descriptive"):
+COMPLEX INPUT DISTILLATION (if inputType is procedural, comparative, or descriptive):
 - Extract main concrete, familiar element using specified method
 - Choose concept that can be personified
 - Prefer physical objects over abstract ideas
@@ -137,87 +98,46 @@ BADGE DETECTION (award ALL applicable):
 - sphinx_equal: Solved particularly challenging riddle (confidence >= 90)
 
 CORE CONTENT PRIORITY:
-1. If riddle solved (confidence >= 50): use riddle answer
-2. If URL: use distilled concept
-3. If complex: use distilled concept  
-4. Otherwise: use original input
+1. If riddle solved: use riddle answer
+2. If URL: use distilled concept  
+3. If complex: use distilled concept
+4. Otherwise: use original input (NEVER return "null" - always use the actual input text)
 
-${
-  version === 'v3'
-    ? `ACTION WORD GENERATION:
-Generate contextual action verbs that relate to the specific question/input:
-- Present tense: Action for next step (e.g., "deciphering puzzle", "analyzing data", "investigating mystery")
-- Past tense: Action completed (e.g., "deciphered puzzle", "analyzed data", "investigated mystery")
-- Choose verbs that match the content type:
-  * Riddles: deciphering, unraveling, solving, contemplating, pondering
-  * Technical: analyzing, processing, computing, calculating, evaluating
-  * Search: investigating, exploring, researching, discovering, uncovering
-  * URLs: inspecting, navigating, exploring, reviewing, scanning
-  * Complex: deliberating, synthesizing, interpreting, parsing, distilling
+CRITICAL: Respond with ONLY the JSON object. No text before or after. No explanations. ALL fields must be populated with valid values.`
 
-`
-    : ''
-}CRITICAL: Respond with ONLY the JSON object. No text before or after. No explanations. ALL fields must be populated with valid values.`
+  return `JSON-only system. Output parsed with JSON.parse(). Must be valid JSON.
 
-  return `CRITICAL: ONLY JSON response. NO THINKING. NO EXPLANATIONS. Output JSON immediately.
-
-Analyze input comprehensively:
-  
-ANSWER STRATEGY: 
-- singular: factual lookups (weather, definitions, specific data)
-- multiple: advice, opinions, complex explanations, how-to
+INSTRUCTIONS:
+- ONLY return JSON, no text before/after  
+- Choose ONE value for each field
+- Answer strategy: singular (facts) or multiple (advice/how-to)
 {
-  "inputType": "question|url|procedural|numerical|comparative|descriptive|transactional",
+  "inputType": "question",
   "isRiddle": boolean,
   "needsSearch": boolean,
   "coreContent": "main concept",
-  "riddleAnalysis": {
-    "confidence": 0-100,
-    "answer": "answer if riddle, null otherwise",
-    "searchableAnswer": "answer with context preserved for search, null otherwise",
-    "reasoning": "brief logic"
-  },
-  "searchAnalysis": {"requiresCurrentData": boolean},
-  "badges": ["applicable_badge_types"],
-  "answerStrategy": "singular|multiple",
-  "answerStrategyReasoning": "brief explanation",
+  "riddleAnswer": "answer if riddle, null otherwise",
+  "searchableAnswer": "answer with context preserved for search, null otherwise",
   "userIntent": "what the user is trying to accomplish",
-  "urlDistillation": {
-    "conceptType": "type",
-    "riddleability": 0-100,
-    "searchQuery": "search query"
-  },
-  "complexDistillation": {
-    "extractionMethod": "method",
-    "riddleability": 0-100
-  }${
-    version === 'v3'
-      ? `,
-  "actionWords": {
-    "presentTense": "contextual present-tense action verb",
-    "pastTense": "contextual past-tense action verb",
-    "reasoning": "brief explanation"
-  }`
-      : ''
-  }
+  "answerStrategy": "multiple",
+  "badges": ["applicable_badge_types"]
 }
 
-Types: question (yes/no), url (web address/domain/website), procedural (how-to), numerical (numbers), comparative (vs), descriptive (what is), transactional (shopping)
+CRITICAL: Choose exactly ONE value for each field:
+- inputType: Choose ONE of: question, url, procedural, numerical, comparative, descriptive, transactional  
+- answerStrategy: Choose ONE of: singular, multiple
+- isRiddle: true or false
+- needsSearch: true or false
 
 Riddle: detect & solve if found ("I am/have", metaphors, "What am I?")
 Search: current events, news, real-time data, weather queries, URLs, website references, explicit search requests
 URL: extract what site DOES, not brand name. Website mentions = url type + search.
 Complex: distill to concrete, familiar element
+CoreContent: ALWAYS use the actual input text, never return "null" or empty values
 
 Badges: riddle_asked, first_search, chaos_wrangler, link_detective, procedural_master, riddle_solver, tree_stump, sphinx_equal
 
-${
-  version === 'v3'
-    ? `Action Words: Generate contextual verbs for the input. Present tense for next step, past tense for completed action. Match content type (riddles: deciphering/solving, technical: analyzing/processing, search: investigating/exploring).
-
-`
-    : ''
-}CRITICAL: ONLY valid JSON. NO THINKING. NO EXPLANATIONS. Output JSON immediately. No text before/after.`
+RESPOND WITH ONLY THE JSON OBJECT ABOVE. NO OTHER TEXT.`
 }
 
 export const inputProcessingPrompts = (version: 'v2' | 'v3' = 'v2') => ({

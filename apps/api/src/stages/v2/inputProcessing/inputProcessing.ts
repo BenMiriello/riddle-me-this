@@ -22,7 +22,6 @@ interface InputProcessingOutput {
   needsSearch: boolean
   processedInput: string
   riddleAnswer?: string
-  riddleConfidence?: number
   searchableAnswer?: string
   userIntent: string
   inputType:
@@ -39,23 +38,11 @@ interface InputProcessingOutput {
     earned: boolean
     context?: string
   }>
-  evaluation: {
-    needsSearch: 'SEARCH' | 'NO_SEARCH'
-    riddleEval: {
-      hasRhyme: boolean
-      hasMetaphor: boolean
-      hasImplicitSubject: boolean
-      hasPlayfulLanguage: boolean
-      hasStructure: boolean
-    }
-  }
   actionWords?: {
     presentTense: string
     pastTense: string
-    reasoning?: string
   }
   answerStrategy: 'singular' | 'multiple'
-  answerStrategyReasoning: string
 }
 
 import { inputProcessingPrompts } from './prompts'
@@ -71,7 +58,6 @@ const inputProcessingStage = async (
   let needsSearch = false
   const processedInput = input.question
   let riddleAnswer: string | undefined
-  let riddleConfidence: number | undefined
   let searchableAnswer: string | undefined
   let userIntent = 'General information seeking'
   let inputType:
@@ -84,21 +70,8 @@ const inputProcessingStage = async (
     | 'transactional' = 'question'
   let coreContent = input.question
   const badges: Array<{ type: string; earned: boolean; context?: string }> = []
-  let evaluation = {
-    needsSearch: 'NO_SEARCH' as 'SEARCH' | 'NO_SEARCH',
-    riddleEval: {
-      hasRhyme: false,
-      hasMetaphor: false,
-      hasImplicitSubject: false,
-      hasPlayfulLanguage: false,
-      hasStructure: false,
-    },
-  }
   let answerStrategy: 'singular' | 'multiple' = 'multiple'
-  let answerStrategyReasoning = 'Default multiple answer approach'
-  let actionWords:
-    | { presentTense: string; pastTense: string; reasoning?: string }
-    | undefined
+  let actionWords: { presentTense: string; pastTense: string } | undefined
 
   // Single comprehensive LLM call that handles everything
   const prompts = inputProcessingPrompts(input.workflowVersion || 'v2')
@@ -110,7 +83,8 @@ const inputProcessingStage = async (
         { role: 'system', content: inputPrompt },
         { role: 'user', content: input.question },
       ],
-    })
+      max_tokens: 512,
+    } as any)
 
     let responseText = response.response.trim()
 
@@ -318,35 +292,43 @@ const inputProcessingStage = async (
     const systemDeterminedSearch = result.needsSearch || false
     needsSearch = input.searchRequested || systemDeterminedSearch
 
-    coreContent = result.coreContent || input.question
+    // Ensure coreContent is never null or empty
+    coreContent =
+      result.coreContent && result.coreContent !== 'null'
+        ? result.coreContent
+        : input.question
 
-    // Handle riddle analysis and solving
-    if (result.riddleAnalysis) {
-      riddleConfidence = result.riddleAnalysis.confidence || 0
-      if (riddleConfidence && riddleConfidence >= 50) {
-        isRiddle = true
-        riddleAnswer = result.riddleAnalysis.answer
-        searchableAnswer = result.riddleAnalysis.searchableAnswer
+    // Handle riddle answer extraction from simplified structure
+    if (result.riddleAnswer) {
+      isRiddle = true
+      riddleAnswer = result.riddleAnswer
+      searchableAnswer = result.searchableAnswer
 
-        // Fallback for missing searchableAnswer on weather queries
-        if (
-          !searchableAnswer &&
-          needsSearch &&
-          input.question.toLowerCase().includes('weather')
-        ) {
-          const locationMatch = input.question.match(
-            /in\s+([^?]+?)(?:\s+today|\s+now|$|\?)/i
-          )
-          if (locationMatch) {
-            const location = locationMatch[1].trim()
-            searchableAnswer = `weather in ${location}`
-          }
+      // Add riddle_solver badge for successful riddle solving
+      badges.push({
+        type: 'riddle_solver',
+        earned: true,
+        context: 'riddle_solved',
+      })
+
+      // Fallback for missing searchableAnswer on weather queries
+      if (
+        !searchableAnswer &&
+        needsSearch &&
+        input.question.toLowerCase().includes('weather')
+      ) {
+        const locationMatch = input.question.match(
+          /in\s+([^?]+?)(?:\s+today|\s+now|$|\?)/i
+        )
+        if (locationMatch) {
+          const location = locationMatch[1].trim()
+          searchableAnswer = `weather in ${location}`
         }
+      }
 
-        // Use riddle answer as core content if solved
-        if (riddleAnswer) {
-          coreContent = riddleAnswer
-        }
+      // Use riddle answer as core content if solved
+      if (riddleAnswer) {
+        coreContent = riddleAnswer
       }
     }
 
@@ -355,33 +337,32 @@ const inputProcessingStage = async (
       userIntent = result.userIntent
     }
 
-    // Extract action words from LLM response
-    if (result.actionWords) {
-      actionWords = {
-        presentTense: result.actionWords.presentTense || 'processing',
-        pastTense: result.actionWords.pastTense || 'processed',
-        reasoning: result.actionWords.reasoning,
+    // Generate actionWords for V3 (since removed from main prompt to avoid truncation)
+    if (input.workflowVersion === 'v3') {
+      // Use context-appropriate action words based on input type and content
+      let presentTense = 'analyzing'
+      let pastTense = 'analyzed'
+
+      if (isRiddle) {
+        presentTense = 'deciphering'
+        pastTense = 'deciphered'
+      } else if (needsSearch) {
+        presentTense = 'investigating'
+        pastTense = 'investigated'
+      } else if (inputType === 'url') {
+        presentTense = 'exploring'
+        pastTense = 'explored'
+      } else if (inputType === 'procedural') {
+        presentTense = 'processing'
+        pastTense = 'processed'
       }
+
+      actionWords = { presentTense, pastTense }
     }
 
-    // Handle URL distillation
-    if (inputType === 'url' && result.urlDistillation) {
-      if (result.urlDistillation.riddleability >= 50) {
-        coreContent = result.coreContent // Already processed by comprehensive prompt
-      }
+    // Handle URL processing
+    if (inputType === 'url') {
       needsSearch = true // Always search for URL content
-    }
-
-    // Handle complex input distillation
-    if (
-      (inputType === 'descriptive' ||
-        inputType === 'procedural' ||
-        inputType === 'comparative') &&
-      result.complexDistillation
-    ) {
-      if (result.complexDistillation.riddleability >= 50) {
-        coreContent = result.coreContent // Already processed by comprehensive prompt
-      }
     }
 
     // Add all badges detected by comprehensive analysis
@@ -395,24 +376,12 @@ const inputProcessingStage = async (
       })
     }
 
-    // Extract evaluation
-    if (result.evaluation) {
-      evaluation = {
-        needsSearch: result.evaluation.needsSearch || 'NO_SEARCH',
-        riddleEval: result.evaluation.riddleEval || evaluation.riddleEval,
-      }
-    }
-
     // Extract answer strategy
     if (result.answerStrategy) {
       answerStrategy = result.answerStrategy
-      answerStrategyReasoning =
-        result.answerStrategyReasoning || 'No reasoning provided'
       console.log(
         'Strategy extracted from comprehensive prompt:',
-        answerStrategy,
-        '-',
-        answerStrategyReasoning
+        answerStrategy
       )
     } else {
       console.log(
@@ -430,7 +399,7 @@ const inputProcessingStage = async (
           {
             role: 'system',
             content:
-              'Respond with only valid JSON. Determine if this needs web search (current events, recent data, specific facts) or is a riddle (has "I am/have", metaphors, "What am I?"). Format: {"inputType": "question", "isRiddle": false, "needsSearch": false, "coreContent": "extracted concept", "badges": []}',
+              'JSON-only system. Choose exactly ONE value: inputType must be "question" (for simple text), "url", "procedural", "numerical", "comparative", "descriptive", or "transactional". answerStrategy must be "singular" or "multiple". Format: {"inputType": "question", "isRiddle": false, "needsSearch": false, "coreContent": "use the actual input text", "userIntent": "what user wants to accomplish", "answerStrategy": "multiple", "badges": []}',
           },
           { role: 'user', content: input.question },
         ],
@@ -621,7 +590,30 @@ const inputProcessingStage = async (
       needsSearch = input.searchRequested || systemDeterminedSearch
 
       isRiddle = fallbackResult.isRiddle || false
-      coreContent = fallbackResult.coreContent || input.question
+      riddleAnswer = fallbackResult.riddleAnswer
+      searchableAnswer = fallbackResult.searchableAnswer
+      // Ensure coreContent is never null or empty
+      coreContent =
+        fallbackResult.coreContent && fallbackResult.coreContent !== 'null'
+          ? fallbackResult.coreContent
+          : input.question
+
+      // Extract other fields from fallback
+      if (fallbackResult.userIntent) {
+        userIntent = fallbackResult.userIntent
+      }
+      if (fallbackResult.answerStrategy) {
+        answerStrategy = fallbackResult.answerStrategy
+      }
+
+      // Add riddle_solver badge if riddle was solved in fallback
+      if (riddleAnswer) {
+        badges.push({
+          type: 'riddle_solver',
+          earned: true,
+          context: 'fallback_riddle_solved',
+        })
+      }
     } catch (fallbackError) {
       console.log('Fallback processing error:', fallbackError)
       // Final fallback to basic processing
@@ -637,15 +629,12 @@ const inputProcessingStage = async (
     needsSearch,
     processedInput,
     riddleAnswer,
-    riddleConfidence,
     searchableAnswer,
     userIntent,
     inputType,
     coreContent,
     badges,
-    evaluation,
     answerStrategy,
-    answerStrategyReasoning,
     actionWords,
   }
 

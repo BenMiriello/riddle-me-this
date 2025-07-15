@@ -6,7 +6,6 @@ interface RiddleResponseInput {
   needsSearch: boolean
   processedInput: string
   riddleAnswer?: string
-  riddleConfidence?: number
   userIntent: string
   inputType:
     | 'question'
@@ -24,7 +23,6 @@ interface RiddleResponseInput {
   answerSource?: 'search' | 'knowledge' | 'riddle_answer'
   actualSearchQuery?: string
   answerStrategy?: 'singular' | 'multiple'
-  answerStrategyReasoning?: string
   env: {
     AI: {
       run: (
@@ -60,7 +58,6 @@ interface RiddleResponseOutput {
   answerSource?: 'search' | 'knowledge' | 'riddle_answer'
   actualSearchQuery?: string
   answerStrategy?: 'singular' | 'multiple'
-  answerStrategyReasoning?: string
   metadata: {
     originalInput: string
     processedInput: string
@@ -86,7 +83,9 @@ const riddleResponseStage = async (
 
   // If input was a riddle and we have an answer, but also check for rich content
   if (input.isRiddle && input.riddleAnswer) {
-    if (input.riddleConfidence && input.riddleConfidence >= 50) {
+    // Check if riddle was successfully solved (riddle_solver badge indicates confidence >= 50)
+    const riddleSolved = input.badges.some((b) => b.type === 'riddle_solver')
+    if (riddleSolved) {
       // If we have rich content from search, use it to create a better response
       if (input.answerContent && input.answerContent.trim().length > 0) {
         // Create ideal solution using userIntent + rich content
@@ -264,7 +263,6 @@ Return EXACTLY this JSON format:
           answerSource: input.answerSource || 'knowledge',
           actualSearchQuery: input.actualSearchQuery,
           answerStrategy: input.answerStrategy,
-          answerStrategyReasoning: input.answerStrategyReasoning,
           metadata: {
             originalInput: input.question,
             processedInput: input.processedInput,
@@ -280,41 +278,20 @@ Return EXACTLY this JSON format:
 
     // Generate single riddle with enhanced prompt for minimal input handling
 
-    const enhancedRiddlePrompt = `You must create a riddle following these steps. When given minimal input, use your knowledge to expand on the concept.
+    const enhancedRiddlePrompt = `Create a riddle from the given answer. Choose a concrete, physical element to focus on.
 
-STEP 1: Input Enhancement
-If the answer is minimal (1-2 words like "rain", "weather", "fog"), expand it using your knowledge:
-- Rain → water droplets falling from clouds, wet, refreshing, creates puddles, helps plants grow
-- Weather → atmospheric conditions, changes daily, affects mood, measured by instruments
-- Fog → water vapor, reduces visibility, mysterious, rolls in from sea, dissipates with sun
+Steps:
+1. If answer is vague (like "weather"), pick a specific concrete thing (like "thermometer")
+2. Create riddle using "I am/have/can" format
+3. Include contradictions or paradoxes
+4. Keep 2-4 lines maximum
 
-STEP 2: Target Selection  
-From the enhanced understanding, choose the most concrete, riddleable element:
-- AVOID: Abstract concepts (climate, patterns, temperatures, general descriptions)
-- CHOOSE: Concrete things people can experience, touch, see, or interact with
+Answer: ${answerToRiddlefy}
 
-Examples:
-- "rain" → Target: "raindrop" (concrete, tangible)
-- "weather" → Target: "barometer" or "thermometer" (concrete instruments)
-- "fog" → Target: "mist" (concrete, visible phenomenon)
-
-STEP 3: Riddle Creation
-Create a riddle about your target using these principles:
-- Use "I am/have/can" format or metaphorical descriptions
-- Create contradictions or paradoxes about its nature  
-- Make it solvable through logical deduction
-- 2-4 lines maximum
-- No meta-commentary or introductions
-
-User Question: ${input.question}
-User Intent: ${input.userIntent}
-Answer to work with: ${answerToRiddlefy}
-
-Return EXACTLY this JSON format:
+Return JSON format:
 {
-  "target": "selected target (1-2 words)",
-  "riddle": "the riddle text only",
-  "reasoning": "brief explanation of target choice and enhancement"
+  "target": "concrete element (1-2 words)",
+  "riddle": "the riddle text only"
 }`
 
     const riddleResponse = await input.env.AI.run(model, {
@@ -325,7 +302,8 @@ Return EXACTLY this JSON format:
           content: `Question: ${input.question}\nUser Intent: ${input.userIntent}\nAnswer: ${answerToRiddlefy}`,
         },
       ],
-    })
+      max_tokens: 512,
+    } as any)
 
     try {
       let responseText = riddleResponse.response.trim()
@@ -449,7 +427,6 @@ Return EXACTLY this JSON format:
     answerSource: input.answerSource || 'knowledge',
     actualSearchQuery: input.actualSearchQuery,
     answerStrategy: input.answerStrategy,
-    answerStrategyReasoning: input.answerStrategyReasoning,
     metadata: {
       originalInput: input.question,
       processedInput: input.processedInput,

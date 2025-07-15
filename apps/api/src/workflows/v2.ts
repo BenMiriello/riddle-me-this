@@ -96,8 +96,9 @@ const workflowV2Adapters = {
       actualSearchQuery: result.searchAnswer?.actualSearchQuery || '',
       answerStrategy: result.inputProcessing?.answerStrategy || 'unknown',
       answerStrategyReasoning:
-        result.inputProcessing?.answerStrategyReasoning ||
-        'No reasoning provided',
+        result.inputProcessing?.answerStrategy === 'singular'
+          ? 'Singular answer strategy selected'
+          : 'Multiple answer strategy selected',
       multipleRiddlesCount: result.riddleResponse?.riddles?.length || 0,
       searchRequested: result.webRequest?.searchRequested || false,
     },
