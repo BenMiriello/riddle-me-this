@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
 
 const FONT_CONFIG = {
   current: 'macondo' as const,
@@ -35,22 +35,41 @@ const advancedRandomWords1 = ['Thistle', 'Mistle', 'Bristol', 'Pistol']
 
 const randomWords2 = ['You', 'Knee', 'Whee', 'We']
 
-const randomWords3 = ['What', 'Why', 'What Now?', 'Where', 'How' , 'When',
-'Who', 'That', 'Thee', 'Thou', 'Thus']
+const randomWords3 = [
+  'What',
+  'Why',
+  'What Now?',
+  'Where',
+  'How',
+  'When',
+  'Who',
+  'That',
+  'Thee',
+  'Thou',
+  'Thus',
+]
 const advancedRandomWords3 = ['Softly', 'Timbers', 'Christmas']
 
 const InteractiveLogo = ({ isLoading = false }: { isLoading?: boolean }) => {
   const [hoveredIndex, setHoveredIndex] = useState<0 | 1 | 2 | null>(null)
   const [highlightedWord, setHighlightedWord] = useState<string | null>(null)
-  const randomWordRefs = useRef<[string, string, string]>(['Riddle', 'Me', 'This'])
+  const randomWordRefs = useRef<[string, string, string]>([
+    'Riddle',
+    'Me',
+    'This',
+  ])
 
   const getWordOptions = (index: number) => {
     if (index === 0) {
-      return isLoading ? [...randomWords1, ...advancedRandomWords1] : randomWords1
+      return isLoading
+        ? [...randomWords1, ...advancedRandomWords1]
+        : randomWords1
     } else if (index === 1) {
       return randomWords2
     } else if (index === 2) {
-      return isLoading ? [...randomWords3, ...advancedRandomWords3] : randomWords3
+      return isLoading
+        ? [...randomWords3, ...advancedRandomWords3]
+        : randomWords3
     }
     return []
   }
@@ -78,7 +97,7 @@ const InteractiveLogo = ({ isLoading = false }: { isLoading?: boolean }) => {
   const handleInteraction = (word: string, index: number) => {
     const randomValue = Math.random()
     const chance = getRandomChance(index)
-    
+
     if (randomValue < chance) {
       // Show random word
       const options = getWordOptions(index)
@@ -88,7 +107,7 @@ const InteractiveLogo = ({ isLoading = false }: { isLoading?: boolean }) => {
       // Show default word
       randomWordRefs.current[index] = getDefaultWord(index)
     }
-    
+
     setHoveredIndex(index as 0 | 1 | 2)
     setHighlightedWord(word)
     setTimeout(() => setHighlightedWord(null), 300)
@@ -102,7 +121,7 @@ const InteractiveLogo = ({ isLoading = false }: { isLoading?: boolean }) => {
   const getExpandedWidth = (index: number) => {
     // Get the current word for this index from refs
     const currentWord = randomWordRefs.current[index]
-    
+
     // Create canvas to measure text width
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
@@ -110,14 +129,14 @@ const InteractiveLogo = ({ isLoading = false }: { isLoading?: boolean }) => {
       console.log('ctx not found in interactive logo :(')
       return 90 // fallback width
     }
-    
+
     // Use smaller font size for measurement, then scale up
     ctx.font = `300 32px ${currentFont.family}`
     const measuredWidth = ctx.measureText(currentWord).width
-    
+
     // Scale from 32px measurement to text-5xl size (approximately 48px)
     const scaledWidth = measuredWidth * (48 / 32)
-    
+
     // Add padding and return rounded width
     return Math.ceil(scaledWidth + 10)
   }
@@ -137,7 +156,10 @@ const InteractiveLogo = ({ isLoading = false }: { isLoading?: boolean }) => {
               key={`visible-${word}`}
               className="inline-block overflow-hidden mr-2"
               style={{
-                width: hoveredIndex === index ? `${getExpandedWidth(index)}px` : '1.5rem',
+                width:
+                  hoveredIndex === index
+                    ? `${getExpandedWidth(index)}px`
+                    : '1.5rem',
                 color: highlightedWord === word ? '#10b981' : 'white',
                 transition: 'width 0.4s ease-in-out, color 0.4s ease-out',
                 fontFamily: fontFamily,
