@@ -49,9 +49,9 @@ app.use(
       ]
 
       // Allow requests with no origin (like mobile apps or curl)
-      if (!origin) return true
+      if (!origin) return '*'
 
-      return allowedOrigins.includes(origin)
+      return allowedOrigins.includes(origin) ? origin : false
     },
     credentials: true,
     allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
