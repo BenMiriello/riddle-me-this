@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const FONT_CONFIG = {
   current: 'macondo' as const,
@@ -30,13 +30,65 @@ if (
   document.head.appendChild(fontLink)
 }
 
-const InteractiveLogo = () => {
-  const [hoveredIndex, setHoveredIndex] = useState<0 | 1 | 2 | null>(null)
-  const [highlightedWord, setHighlightedWord] = useState<
-    'Riddle' | 'Me' | 'This' | null
-  >(null)
+const randomWords1 = ['Whittle', 'Whistle', 'Fiddle', 'Middle']
+const advancedRandomWords1 = ['Thistle', 'Mistle', 'Bristol', 'Pistol']
 
-  const handleInteraction = (word: 'Riddle' | 'Me' | 'This', index: number) => {
+const randomWords2 = ['You', 'Knee', 'Whee', 'We']
+
+const randomWords3 = ['What', 'Why', 'What Now?', 'Where', 'How' , 'When',
+'Who', 'That', 'Thee', 'Thou', 'Thus']
+const advancedRandomWords3 = ['Softly', 'Timbers', 'Christmas']
+
+const InteractiveLogo = ({ isLoading = false }: { isLoading?: boolean }) => {
+  const [hoveredIndex, setHoveredIndex] = useState<0 | 1 | 2 | null>(null)
+  const [highlightedWord, setHighlightedWord] = useState<string | null>(null)
+  const randomWordRefs = useRef<[string, string, string]>(['Riddle', 'Me', 'This'])
+
+  const getWordOptions = (index: number) => {
+    if (index === 0) {
+      return isLoading ? [...randomWords1, ...advancedRandomWords1] : randomWords1
+    } else if (index === 1) {
+      return randomWords2
+    } else if (index === 2) {
+      return isLoading ? [...randomWords3, ...advancedRandomWords3] : randomWords3
+    }
+    return []
+  }
+
+  const getDefaultWord = (index: number) => {
+    if (index === 0) return 'Riddle'
+    if (index === 1) return 'Me'
+    if (index === 2) return 'This'
+    return ''
+  }
+
+  const getRandomChance = (index: number) => {
+    if (isLoading) {
+      if (index === 0) return 0.5
+      if (index === 1) return 0.333
+      if (index === 2) return 1.0
+    } else {
+      if (index === 0) return 0.1
+      if (index === 1) return 0.0
+      if (index === 2) return 0.25
+    }
+    return 0
+  }
+
+  const handleInteraction = (word: string, index: number) => {
+    const randomValue = Math.random()
+    const chance = getRandomChance(index)
+    
+    if (randomValue < chance) {
+      // Show random word
+      const options = getWordOptions(index)
+      const randomIndex = Math.floor(Math.random() * options.length)
+      randomWordRefs.current[index] = options[randomIndex]
+    } else {
+      // Show default word
+      randomWordRefs.current[index] = getDefaultWord(index)
+    }
+    
     setHoveredIndex(index as 0 | 1 | 2)
     setHighlightedWord(word)
     setTimeout(() => setHighlightedWord(null), 300)
@@ -48,20 +100,32 @@ const InteractiveLogo = () => {
   const fontFamily = currentFont.family
 
   const getExpandedWidth = (index: number) => {
-    // Approximate widths for text-5xl font-light
-    if (index === 0) return 130 // "Riddle"
-    if (index === 1) return 70 // "Me"
-    if (index === 2) return 90 // "This"
+    // Get the current word for this index from refs
+    const currentWord = randomWordRefs.current[index]
+    
+    // Create canvas to measure text width
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) {
+      console.log('ctx not found in interactive logo :(')
+      return 90 // fallback width
+    }
+    
+    // Use smaller font size for measurement, then scale up
+    ctx.font = `300 32px ${currentFont.family}`
+    const measuredWidth = ctx.measureText(currentWord).width
+    
+    // Scale from 32px measurement to text-5xl size (approximately 48px)
+    const scaledWidth = measuredWidth * (48 / 32)
+    
+    // Add padding and return rounded width
+    return Math.ceil(scaledWidth + 10)
   }
 
-  const wordStyle = (word: typeof highlightedWord, index: number) => ({
-    width: hoveredIndex === index ? `${getExpandedWidth(index)}px` : '1.5rem',
-    color: highlightedWord === word ? '#10b981' : 'white',
-    transition:
-      'width 0.4s ease-in-out' +
-      (highlightedWord !== word ? ', color 0.4s ease-out' : ''),
-    fontFamily: fontFamily,
-  })
+  const pickWord = (index: number) => {
+    // Use the ref value for all words (immediately available)
+    return randomWordRefs.current[index]
+  }
 
   return (
     <div className="text-center mb-8">
@@ -72,10 +136,15 @@ const InteractiveLogo = () => {
             <span
               key={`visible-${word}`}
               className="inline-block overflow-hidden mr-2"
-              style={wordStyle(word, index)}
+              style={{
+                width: hoveredIndex === index ? `${getExpandedWidth(index)}px` : '1.5rem',
+                color: highlightedWord === word ? '#10b981' : 'white',
+                transition: 'width 0.4s ease-in-out, color 0.4s ease-out',
+                fontFamily: fontFamily,
+              }}
             >
               <span className="whitespace-nowrap transition-opacity duration-200">
-                {hoveredIndex === index ? word : '?'}
+                {hoveredIndex === index ? pickWord(index) : '?'}
               </span>
             </span>
           ))}
@@ -90,7 +159,7 @@ const InteractiveLogo = () => {
             <span
               key={`overlay-${word}`}
               className="cursor-pointer mr-2 py-2 px-4"
-              onMouseEnter={() => setHoveredIndex(index as 0 | 1 | 2)}
+              onMouseEnter={() => handleInteraction(word, index)}
               onMouseLeave={() => setHoveredIndex(null)}
               onClick={() => handleInteraction(word, index)}
             >

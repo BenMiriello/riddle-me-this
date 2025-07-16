@@ -41,24 +41,18 @@ export class Workflow {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async execute(initialInput: any): Promise<any> {
     const executionOrder = this.topologicalSort()
-    const executionState = this.createExecutionState(
-      initialInput,
-      executionOrder
-    )
-
+    const executionState = this.createExecutionState(initialInput, executionOrder)
+    
     // Run all steps to completion
     await this.executeSteps(executionState, 'complete')
-
+    
     return this.buildResponseData(executionState)
   }
 
   // Yielding execution mode (v3) - start session and run until first yield
-  async start(
-    initialInput: any,
-    sessionId: string
-  ): Promise<SessionExecutionResult> {
+  async start(initialInput: any, sessionId: string): Promise<SessionExecutionResult> {
     const executionOrder = this.topologicalSort()
-
+    
     const sessionState: SessionState = {
       sessionId,
       currentStep: executionOrder[0],
@@ -69,7 +63,7 @@ export class Workflow {
       cancelled: false,
       completed: false,
       executionOrder,
-      yieldResponses: new Map(),
+      yieldResponses: new Map()
     }
 
     this.sessions.set(sessionId, sessionState)
@@ -77,10 +71,7 @@ export class Workflow {
   }
 
   // Continue yielding execution from where we left off
-  async continue(
-    sessionId: string,
-    expectedStep?: string
-  ): Promise<SessionExecutionResult> {
+  async continue(sessionId: string, expectedStep?: string): Promise<SessionExecutionResult> {
     const sessionState = this.sessions.get(sessionId)
     if (!sessionState) {
       throw new Error(`Session ${sessionId} not found`)
@@ -96,9 +87,7 @@ export class Workflow {
 
     // Validate expected step if provided
     if (expectedStep && sessionState.currentStep !== expectedStep) {
-      throw new Error(
-        `Expected step '${expectedStep}' but session is at '${sessionState.currentStep}'`
-      )
+      throw new Error(`Expected step '${expectedStep}' but session is at '${sessionState.currentStep}'`)
     }
 
     return await this.executeUntilYield(sessionState, false)
@@ -119,24 +108,16 @@ export class Workflow {
       return null
     }
 
-    return this.buildSessionResult(
-      sessionState,
-      false,
-      this.calculateProgress(sessionState)
-    )
+    return this.buildSessionResult(sessionState, false, this.calculateProgress(sessionState))
   }
 
   // SHARED CORE EXECUTION ENGINE - 95% of logic is identical for both modes
-  private async executeSteps(
-    state: any,
-    mode: 'complete' | 'yielding',
-    startIndex = 0
-  ): Promise<void> {
+  private async executeSteps(state: any, mode: 'complete' | 'yielding', startIndex = 0): Promise<void> {
     const { executionOrder, context, results, executed, initialInput } = state
-
+    
     for (let i = startIndex; i < executionOrder.length; i++) {
       const stepName = executionOrder[i]
-
+      
       // Skip already executed steps
       if (executed.has(stepName)) {
         continue
@@ -146,10 +127,9 @@ export class Workflow {
 
       // Check if step should be executed based on 'when' condition
       if (step.options?.when) {
-        const shouldExecute =
-          typeof step.options.when === 'string'
-            ? this.evaluateStringCondition(step.options.when, context)
-            : step.options.when(context as PipelineContext<any>)
+        const shouldExecute = typeof step.options.when === 'string'
+          ? this.evaluateStringCondition(step.options.when, context)
+          : step.options.when(context as PipelineContext<any>)
 
         if (!shouldExecute) {
           continue
@@ -205,30 +185,22 @@ export class Workflow {
   }
 
   // Yielding-specific execution wrapper
-  private async executeUntilYield(
-    sessionState: SessionState,
-    isFirstResponse: boolean
-  ): Promise<SessionExecutionResult> {
-    const startIndex = sessionState.executionOrder.indexOf(
-      sessionState.currentStep
-    )
+  private async executeUntilYield(sessionState: SessionState, isFirstResponse: boolean): Promise<SessionExecutionResult> {
+    const startIndex = sessionState.executionOrder.indexOf(sessionState.currentStep)
     const actualStartIndex = startIndex === -1 ? 0 : startIndex
-
+    
     await this.executeSteps(sessionState, 'yielding', actualStartIndex)
-
+    
     // Check if we stopped at a yield point
     const lastExecutedStep = Array.from(sessionState.executed).pop()
     if (lastExecutedStep) {
       const yieldPoint = this.findNextYieldPoint(lastExecutedStep)
       if (yieldPoint) {
         const yieldStep = this.yields.get(yieldPoint)!
-        const yieldResponse = yieldStep.yieldFn(
-          this.buildResponseData(sessionState)
-        )
-
+        const yieldResponse = yieldStep.yieldFn(this.buildResponseData(sessionState))
+        
         sessionState.yieldResponses.set(yieldPoint, yieldResponse)
-        sessionState.currentStep =
-          yieldResponse.nextStep || sessionState.currentStep
+        sessionState.currentStep = yieldResponse.nextStep || sessionState.currentStep
 
         return {
           sessionId: sessionState.sessionId,
@@ -239,11 +211,11 @@ export class Workflow {
           completed: sessionState.completed,
           actionWord: yieldResponse.actionWord,
           completedAction: yieldResponse.completedAction,
-          isFirstResponse,
+          isFirstResponse
         }
       }
     }
-
+    
     // No yield point found, workflow is complete
     return this.buildSessionResult(sessionState, isFirstResponse, 'Complete')
   }
@@ -255,7 +227,7 @@ export class Workflow {
       results: new Map<string, unknown>(),
       executed: new Set<string>(),
       initialInput,
-      executionOrder,
+      executionOrder
     }
   }
 
@@ -268,12 +240,7 @@ export class Workflow {
     return structuredResponse
   }
 
-  private buildSessionResult(
-    sessionState: SessionState,
-    isFirstResponse: boolean,
-    progress: string,
-    cancelled = false
-  ): SessionExecutionResult {
+  private buildSessionResult(sessionState: SessionState, isFirstResponse: boolean, progress: string, cancelled = false): SessionExecutionResult {
     return {
       sessionId: sessionState.sessionId,
       data: this.buildResponseData(sessionState),
@@ -282,7 +249,7 @@ export class Workflow {
       progress,
       completed: sessionState.completed,
       cancelled,
-      isFirstResponse,
+      isFirstResponse
     }
   }
 
@@ -295,10 +262,7 @@ export class Workflow {
     return null
   }
 
-  private findNextStep(
-    executionOrder: string[],
-    currentIndex: number
-  ): string | undefined {
+  private findNextStep(executionOrder: string[], currentIndex: number): string | undefined {
     return executionOrder[currentIndex + 1]
   }
 

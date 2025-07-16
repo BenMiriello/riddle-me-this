@@ -178,19 +178,10 @@ const WorkflowV3 = pipeline()
       let actionWord = needsSearch
         ? 'searching knowledge'
         : getRandomActionWord(data.webRequest?.question || '')
-      let completedAction = getCompletionPhrase('inputProcessing', data)
-
-      if (data.inputProcessing?.actionWords) {
-        actionWord = needsSearch
-          ? 'searching knowledge'
-          : data.inputProcessing.actionWords.presentTense
-        completedAction = data.inputProcessing.actionWords.pastTense
-      }
 
       return {
         nextStep,
         actionWord,
-        completedAction,
       }
     },
     { after: ['inputProcessing'] }

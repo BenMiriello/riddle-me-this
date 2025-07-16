@@ -14,20 +14,6 @@ interface ActionHistory {
   id: string
 }
 
-// Fallback action words for progressive UI simulation
-const FALLBACK_ACTIONS = [
-  'analyzing riddle',
-  'deciphering input',
-  'processing question',
-  'contemplating puzzle',
-  'examining query',
-  'unraveling mystery',
-  'searching knowledge',
-  'evaluating options',
-  'crafting response',
-  'finalizing answer',
-  'polishing result',
-]
 
 export const useSession = () => {
   const [state, setState] = useState<SessionState>({
@@ -63,6 +49,21 @@ export const useSession = () => {
   }, [])
 
   const startProgression = () => {
+    // V3-only fallback action words for progressive UI simulation
+    const FALLBACK_ACTIONS = [
+      'analyzing riddle',
+      'deciphering input',
+      'processing question',
+      'contemplating puzzle',
+      'examining query',
+      'unraveling mystery',
+      'searching knowledge',
+      'evaluating options',
+      'crafting response',
+      'finalizing answer',
+      'polishing result',
+    ]
+
     let wordIndex = 0
     let actionIndex = 0
     const MAX_PROGRESSION_STEPS = FALLBACK_ACTIONS.length
@@ -77,9 +78,7 @@ export const useSession = () => {
         return
       }
 
-      // Use fallback actions for progression simulation
       const currentWord = FALLBACK_ACTIONS[wordIndex]
-
       setState((prev) => ({ ...prev, currentAction: currentWord }))
 
       // Add completed action to history after a delay
@@ -126,7 +125,7 @@ export const useSession = () => {
 
   const startSession = async (
     question: string,
-    workflow: 'v1' | 'v2' | 'v3' = 'v3'
+    workflow: 'v1' | 'v2' | 'v3' | 'v4' = 'v4'
   ) => {
     // Reset state
     setState({
@@ -141,7 +140,6 @@ export const useSession = () => {
     cancelledRef.current = false
     abortControllerRef.current = new AbortController()
 
-    // Start progression simulation for v3
     if (workflow === 'v3') {
       startProgression()
     }
@@ -168,7 +166,7 @@ export const useSession = () => {
           ...prev,
           isLoading: false,
           isCancelling: false,
-          finalResponse: { cancelled: true, message: 'Request cancelled' },
+          finalResponse: { cancelled: true, message: 'Riddle me not, I guess...' },
         }))
         return
       }
@@ -189,7 +187,7 @@ export const useSession = () => {
           ...prev,
           isLoading: false,
           isCancelling: false,
-          finalResponse: { cancelled: true, message: 'Request cancelled' },
+          finalResponse: { cancelled: true, message: 'Riddle me not, I guess...' },
         }))
       } else {
         setState((prev) => ({

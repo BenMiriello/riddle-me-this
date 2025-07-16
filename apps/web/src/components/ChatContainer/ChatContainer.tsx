@@ -15,8 +15,15 @@ interface SingleRiddle {
   finalResponse: string
   responseType: string
   riddleTarget?: string
-  riddleQuality?: number
   sourceResult?: SearchResult
+}
+
+interface ApiResponseData {
+  finalResponse: string
+  searchResults?: SearchResult[]
+  riddles?: SingleRiddle[]
+  riddleResponse?: ApiResponseData // V3 nested format
+  cancelled?: boolean
 }
 
 const ChatContainer = () => {
@@ -53,44 +60,37 @@ const ChatContainer = () => {
     }, 15)
   }
 
+  const getResponseData = (response: any): ApiResponseData | null => {
+    if (response.cancelled) return null
+    
+    // V3 format (nested) or V4 format (direct)
+    return response.riddleResponse || response
+  }
+
   // Handle final response when session completes
   useEffect(() => {
-    if (finalResponse) {
-      console.log('🔧 Complete V3 API Response Object:', finalResponse)
-
-      // Check if this is a cancellation response
-      if (finalResponse.cancelled) {
-        typeResponse('Request cancelled')
-        return
-      }
-
-      // Process the final response data
-      const riddleResponseData = finalResponse.riddleResponse
-      if (riddleResponseData) {
-        // Set primary source if available
-        if (
-          riddleResponseData.searchResults &&
-          riddleResponseData.searchResults.length > 0
-        ) {
-          setPrimarySource(riddleResponseData.searchResults[0])
-        }
-
-        // Set riddles if available
-        if (
-          riddleResponseData.riddles &&
-          riddleResponseData.riddles.length > 0
-        ) {
-          setRiddles(riddleResponseData.riddles)
-        }
-
-        // Type the response
-        if (riddleResponseData.finalResponse) {
-          typeResponse(riddleResponseData.finalResponse)
-        } else {
-          typeResponse('The riddle escaped me this time...')
-        }
-      }
+    if (!finalResponse) return
+    
+    console.log('Complete API Response Object:', finalResponse)
+    
+    if (finalResponse.cancelled) {
+      typeResponse('Riddle me not, I guess...')
+      return
     }
+
+    const data = getResponseData(finalResponse)
+    if (!data) return
+
+    // Clean, typed data processing
+    if (data.searchResults && data.searchResults.length > 0) {
+      setPrimarySource(data.searchResults[0])
+    }
+    
+    if (data.riddles && data.riddles.length > 0) {
+      setRiddles(data.riddles)
+    }
+    
+    typeResponse(data.finalResponse || 'The riddle escaped me this time...')
   }, [finalResponse])
 
   const handleSubmit = async (question: string) => {
@@ -102,7 +102,7 @@ const ChatContainer = () => {
     resetSession()
 
     try {
-      await startSession(question, 'v3')
+      await startSession(question, 'v4')
     } catch (error) {
       console.error('Error:', error)
       typeResponse('Riddle me not. An error occurred getting your response...')
@@ -137,7 +137,7 @@ const ChatContainer = () => {
   return (
     <div className="flex flex-col min-h-screen bg-gray-800 text-white">
       <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full max-w-md px-4">
-        <InteractiveLogo />
+        <InteractiveLogo isLoading={isLoading} />
         <ChatInput onSubmit={handleSubmit} isLoading={isLoading || isTyping} />
 
         {/* Progressive Loading UI */}

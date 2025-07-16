@@ -1,4 +1,3 @@
-import React from 'react'
 import SearchResponseCard from './SearchResponseCard'
 
 // Load Macondo font
@@ -23,7 +22,6 @@ interface SingleRiddle {
   finalResponse: string
   responseType: string
   riddleTarget?: string
-  riddleQuality?: number
   sourceResult?: SourceType
 }
 
