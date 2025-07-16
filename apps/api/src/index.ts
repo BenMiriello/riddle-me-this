@@ -36,10 +36,28 @@ interface Env {
 
 const app = new Hono<{ Bindings: Env }>()
 
-app.use('*', cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000', 'http://127.0.0.1:5173'],
-  credentials: true
-}))
+app.use(
+  '*',
+  cors({
+    origin: (origin) => {
+      const allowedOrigins = [
+        'http://localhost:5173',
+        'http://localhost:3000',
+        'http://127.0.0.1:5173',
+        'https://riddlemethis.io',
+        'https://www.riddlemethis.io',
+      ]
+
+      // Allow requests with no origin (like mobile apps or curl)
+      if (!origin) return true
+
+      return allowedOrigins.includes(origin)
+    },
+    credentials: true,
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization'],
+  })
+)
 
 app.get('/', (c) => {
   return c.text('RiddleMeThis API')
@@ -125,7 +143,10 @@ app.post('/riddle', async (c) => {
         console.log('Processing time:', processingTime + 'ms')
         console.log('Response type:', finalResponse.responseType)
         console.log('Search performed:', finalResponse.searchPerformed)
-        console.log('Final response preview:', finalResponse.finalResponse.substring(0, 100) + '...')
+        console.log(
+          'Final response preview:',
+          finalResponse.finalResponse.substring(0, 100) + '...'
+        )
         console.log('=== V4 REQUEST END ===\n')
 
         return c.json(finalResponse)
@@ -239,7 +260,7 @@ app.post('/riddle', async (c) => {
 // // V4 endpoint - Smart model routing with simplified stages
 // app.post('/v4/riddle', async (c) => {
 //   const startTime = Date.now()
-  
+
 //   try {
 //     const { question } = await c.req.json()
 
@@ -265,7 +286,7 @@ app.post('/riddle', async (c) => {
 //     }
 
 //     const result = await executeV4Workflow(workflowInput)
-    
+
 //     // Extract the final response from the pipeline result
 //     const finalResponse = result.responseAssembly || result
 
