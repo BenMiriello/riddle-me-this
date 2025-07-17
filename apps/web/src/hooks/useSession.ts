@@ -14,7 +14,6 @@ interface ActionHistory {
   id: string
 }
 
-
 export const useSession = () => {
   const [state, setState] = useState<SessionState>({
     isLoading: false,
@@ -145,7 +144,11 @@ export const useSession = () => {
     }
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/riddle`, {
+      const apiUrl = `${import.meta.env.VITE_API_URL}/riddle`
+      console.log('🔍 Making API request to:', apiUrl)
+      console.log('🔍 Request body:', { question, workflow })
+
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -153,6 +156,8 @@ export const useSession = () => {
         body: JSON.stringify({ question, workflow }),
         signal: abortControllerRef.current.signal,
       })
+
+      console.log('🔍 Response status:', response.status, response.statusText)
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -166,7 +171,10 @@ export const useSession = () => {
           ...prev,
           isLoading: false,
           isCancelling: false,
-          finalResponse: { cancelled: true, message: 'Riddle me not, I guess...' },
+          finalResponse: {
+            cancelled: true,
+            message: 'Riddle me not, I guess...',
+          },
         }))
         return
       }
@@ -187,16 +195,22 @@ export const useSession = () => {
           ...prev,
           isLoading: false,
           isCancelling: false,
-          finalResponse: { cancelled: true, message: 'Riddle me not, I guess...' },
+          finalResponse: {
+            cancelled: true,
+            message: 'Riddle me not, I guess...',
+          },
         }))
       } else {
+        // More detailed error for mobile debugging
+        const apiUrl = import.meta.env.VITE_API_URL
+        const errorMsg =
+          error instanceof Error ? error.message : 'Unknown error'
+        const detailedError = `API Error: ${errorMsg}. URL: ${apiUrl}/riddle. Check network connection.`
+
         setState((prev) => ({
           ...prev,
           isLoading: false,
-          error:
-            error instanceof Error
-              ? error.message
-              : 'Failed to process question',
+          error: detailedError,
         }))
       }
     }

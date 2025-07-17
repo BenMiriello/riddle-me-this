@@ -1,5 +1,27 @@
 import { useState, useRef } from 'react'
 
+// Load Macondo Swash Caps font (consistent with other components)
+const fontLink = document.createElement('link')
+fontLink.href =
+  'https://fonts.googleapis.com/css2?family=Macondo+Swash+Caps&display=swap'
+fontLink.rel = 'stylesheet'
+if (!document.head.querySelector('link[href*="Macondo+Swash+Caps"]')) {
+  document.head.appendChild(fontLink)
+}
+
+const macondoFont: React.CSSProperties = {
+  fontFamily: 'Macondo Swash Caps, cursive',
+  fontSize: '1.125rem', // Slightly bigger for input
+}
+
+const macondoButtonFont: React.CSSProperties = {
+  fontFamily: 'Macondo Swash Caps, cursive',
+  fontSize: '1.25rem', // Bigger for button
+  WebkitFontSmoothing: 'antialiased',
+  MozOsxFontSmoothing: 'grayscale',
+  textRendering: 'optimizeLegibility',
+}
+
 interface ChatInputProps {
   onSubmit: (question: string) => void
   isLoading: boolean
@@ -82,12 +104,13 @@ const ChatInput = ({ onSubmit, isLoading }: ChatInputProps) => {
           onBlur={forceBlur}
           placeholder="Riddle this for me..."
           rows={1}
-          className="flex-1 bg-gray-600 text-white text-sm border border-gray-500 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 resize-none focus:text-base md:focus:text-sm"
+          className="flex-1 bg-gray-600 text-white border border-gray-500 rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-green-500 focus:border-green-500 resize-none"
           disabled={isLoading}
           style={{
             height: 'auto',
             minHeight: '2.5rem',
             overflowY: 'hidden',
+            ...macondoFont,
           }}
           onInput={(e) => {
             const target = e.target as HTMLTextAreaElement
@@ -97,7 +120,8 @@ const ChatInput = ({ onSubmit, isLoading }: ChatInputProps) => {
         <button
           type="submit"
           disabled={isLoading || !inputValue.trim()}
-          className="bg-green-600 hover:bg-green-500 disabled:bg-gray-600 text-white px-4 rounded-lg transition-colors text-sm h-10"
+          className="bg-green-600 hover:bg-green-500 disabled:bg-gray-600 text-white px-4 rounded-lg transition-colors h-10"
+          style={macondoButtonFont}
         >
           Send
         </button>

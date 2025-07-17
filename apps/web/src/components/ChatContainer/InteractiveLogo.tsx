@@ -117,6 +117,12 @@ const InteractiveLogo = ({ isLoading = false }: { isLoading?: boolean }) => {
 
   const baseClasses = 'text-5xl select-none'
   const fontFamily = currentFont.family
+  const fontStyle: React.CSSProperties = {
+    fontFamily: fontFamily,
+    WebkitFontSmoothing: 'antialiased',
+    MozOsxFontSmoothing: 'grayscale',
+    textRendering: 'optimizeLegibility',
+  }
 
   const getExpandedWidth = (index: number) => {
     // Get the current word for this index from refs
@@ -150,7 +156,7 @@ const InteractiveLogo = ({ isLoading = false }: { isLoading?: boolean }) => {
     <div className="text-center mb-8">
       <div className="relative">
         {/* Visible layer - display only */}
-        <div className={`${baseClasses} text-white`} style={{ fontFamily }}>
+        <div className={`${baseClasses} text-white`} style={fontStyle}>
           {words.map((word, index) => (
             <span
               key={`visible-${word}`}
@@ -162,7 +168,7 @@ const InteractiveLogo = ({ isLoading = false }: { isLoading?: boolean }) => {
                     : '1.5rem',
                 color: highlightedWord === word ? '#10b981' : 'white',
                 transition: 'width 0.4s ease-in-out, color 0.4s ease-out',
-                fontFamily: fontFamily,
+                ...fontStyle,
               }}
             >
               <span className="whitespace-nowrap transition-opacity duration-200">
@@ -175,7 +181,7 @@ const InteractiveLogo = ({ isLoading = false }: { isLoading?: boolean }) => {
         {/* Invisible overlay - event handling */}
         <div
           className={`${baseClasses} absolute inset-0 opacity-0 right-2`}
-          style={{ fontFamily }}
+          style={fontStyle}
         >
           {words.map((word, index) => (
             <span
@@ -183,7 +189,6 @@ const InteractiveLogo = ({ isLoading = false }: { isLoading?: boolean }) => {
               className="cursor-pointer mr-2 py-2 px-4"
               onMouseEnter={() => handleInteraction(word, index)}
               onMouseLeave={() => setHoveredIndex(null)}
-              onClick={() => handleInteraction(word, index)}
             >
               ?
             </span>

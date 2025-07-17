@@ -11,4 +11,8 @@ export default defineConfig({
         execSync('git rev-parse HEAD').toString().trim()
     ),
   },
+  server: {
+    host: true, // Allow external connections
+    port: 5173,
+  },
 })

@@ -1,15 +1,16 @@
 import SearchResponseCard from './SearchResponseCard'
 
-// Load Macondo font
+// Load Macondo Swash Caps font (same as InteractiveLogo)
 const fontLink = document.createElement('link')
-fontLink.href = 'https://fonts.googleapis.com/css2?family=Macondo&display=swap'
+fontLink.href =
+  'https://fonts.googleapis.com/css2?family=Macondo+Swash+Caps&display=swap'
 fontLink.rel = 'stylesheet'
-if (!document.head.querySelector('link[href*="Macondo"]')) {
+if (!document.head.querySelector('link[href*="Macondo+Swash+Caps"]')) {
   document.head.appendChild(fontLink)
 }
 
-const responseTextStyle = {
-  fontFamily: 'Macondo, cursive',
+const responseTextStyle: React.CSSProperties = {
+  fontFamily: 'Macondo Swash Caps, cursive',
 }
 
 interface SourceType {
