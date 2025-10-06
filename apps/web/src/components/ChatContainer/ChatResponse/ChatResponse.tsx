@@ -31,6 +31,9 @@ interface ChatResponseProps {
   isTyping: boolean
   primarySource: SourceType | null
   riddles?: SingleRiddle[] | null
+  winningText?: string | null
+  badgeTier?: 'gold' | 'silver' | null
+  fullTextLength?: number
 }
 
 const ChatResponse = ({
@@ -38,7 +41,22 @@ const ChatResponse = ({
   isTyping,
   primarySource,
   riddles,
+  winningText,
+  badgeTier,
+  fullTextLength,
 }: ChatResponseProps) => {
+  // Check if this response should glow - only for badge responses
+  const shouldGlow = winningText && badgeTier
+  const glowClass = shouldGlow
+    ? badgeTier === 'gold'
+      ? 'text-glow-gold'
+      : 'text-glow-silver'
+    : ''
+
+  // Add indent for short responses - use full text length if available
+  const textLength = fullTextLength || response.length
+  const shouldIndent = textLength < 15
+  const indentStyle = shouldIndent ? { paddingLeft: '1rem' } : {}
   // If we have multiple riddles, display them as separate cards
   if (riddles && riddles.length > 1) {
     return (
@@ -66,7 +84,10 @@ const ChatResponse = ({
   }
 
   return (
-    <div className="text-white text-lg" style={responseTextStyle}>
+    <div
+      className={`text-white text-lg ${glowClass}`}
+      style={{ ...responseTextStyle, ...indentStyle, whiteSpace: 'pre-wrap' }}
+    >
       {response}
       {isTyping && response && <span className="animate-pulse">|</span>}
     </div>

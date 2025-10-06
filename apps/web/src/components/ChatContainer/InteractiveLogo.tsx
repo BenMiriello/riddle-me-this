@@ -30,8 +30,14 @@ if (
   document.head.appendChild(fontLink)
 }
 
-const randomWords1 = ['Whittle', 'Whistle', 'Fiddle', 'Middle']
-const advancedRandomWords1 = ['Thistle', 'Mistle', 'Bristol', 'Pistol']
+const randomWords1 = ['Whittle', 'Whistle', 'Fiddle']
+const advancedRandomWords1 = [
+  'Thistle',
+  'Middle',
+  'Mistle',
+  'Brittle',
+  'Pistol',
+]
 
 const randomWords2 = ['You', 'Knee', 'Whee', 'We']
 

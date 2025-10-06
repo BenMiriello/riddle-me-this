@@ -59,7 +59,7 @@ const ProgressiveLoading = ({
           clearInterval(timer)
           setIsWritingWord(false)
         }
-      }, 50) // Fast typing animation
+      }, 25) // Fast typing animation
 
       return () => clearInterval(timer)
     }

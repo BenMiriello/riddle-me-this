@@ -11,6 +11,7 @@ if (!document.head.querySelector('link[href*="Macondo"]')) {
 const responseTextStyle = {
   fontFamily: 'Macondo, cursive',
   letterSpacing: '0.025em',
+  whiteSpace: 'pre-wrap' as const,
 }
 
 interface SourceType {

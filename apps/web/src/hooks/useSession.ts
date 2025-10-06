@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
+import { detectRiddleBadge } from '../utils/badgeDetection'
+import { useBadges } from '../contexts/BadgeContext'
 
 interface SessionState {
   isLoading: boolean
@@ -7,6 +9,8 @@ interface SessionState {
   finalResponse: Record<string, unknown> | null
   error: string | null
   isCancelling: boolean
+  winningText: string | null
+  badgeTier: 'gold' | 'silver' | null
 }
 
 interface ActionHistory {
@@ -15,6 +19,7 @@ interface ActionHistory {
 }
 
 export const useSession = () => {
+  const { awardBadge } = useBadges()
   const [state, setState] = useState<SessionState>({
     isLoading: false,
     currentAction: '',
@@ -22,6 +27,8 @@ export const useSession = () => {
     finalResponse: null,
     error: null,
     isCancelling: false,
+    winningText: null,
+    badgeTier: null,
   })
 
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -126,7 +133,89 @@ export const useSession = () => {
     question: string,
     workflow: 'v1' | 'v2' | 'v3' | 'v4' = 'v4'
   ) => {
-    // Reset state
+    const badgeDetection = detectRiddleBadge(question)
+    const winningText: string | null = null
+
+    if (badgeDetection) {
+      const contextualActions = {
+        gold: [
+          'Oh I know this one',
+          'Ah, a classic riddle!',
+          "This one's familiar",
+        ],
+        silver: [
+          'You might be onto something there',
+          'Where have I heard that before?',
+          'That rings a bell',
+        ],
+      }
+
+      const actionText =
+        contextualActions[badgeDetection.tier][
+          Math.floor(
+            Math.random() * contextualActions[badgeDetection.tier].length
+          )
+        ]
+
+      setState({
+        isLoading: true,
+        currentAction: actionText,
+        actionHistory: [],
+        finalResponse: null,
+        error: null,
+        isCancelling: false,
+        winningText: question,
+        badgeTier: badgeDetection.tier,
+      })
+
+      // Award badge and show response after 2s delay
+      setTimeout(() => {
+        awardBadge({
+          id: badgeDetection.badge.id,
+          name: badgeDetection.badge.name,
+          description: badgeDetection.badge.description,
+          tier: badgeDetection.tier,
+          triggerText: question,
+        })
+
+        // Return appropriate response based on input type
+        let responseText = ''
+
+        if (badgeDetection.tier === 'gold') {
+          // Riddle input → return answer
+          if (badgeDetection.badge.answer) {
+            responseText = badgeDetection.badge.answer
+          } else {
+            // Special riddles with no answer (Alice in Wonderland, etc.)
+            responseText =
+              badgeDetection.badge.hardcodedResponse ||
+              'Some questions have no answers, only wonder.'
+          }
+        } else {
+          // Answer input → return riddle
+          responseText = badgeDetection.badge.riddleText
+        }
+
+        setState({
+          isLoading: false,
+          currentAction: '',
+          actionHistory: [],
+          finalResponse: {
+            finalResponse: responseText,
+            badgeAwarded: true,
+            badgeTier: badgeDetection.tier,
+          },
+          error: null,
+          isCancelling: false,
+          winningText: question,
+          badgeTier: badgeDetection.tier,
+        })
+      }, 3000)
+
+      return
+    }
+
+    // Reset state for API call
     setState({
       isLoading: true,
       currentAction: '',
@@ -134,12 +223,14 @@ export const useSession = () => {
       finalResponse: null,
       error: null,
       isCancelling: false,
+      winningText,
+      badgeTier: null,
     })
 
     cancelledRef.current = false
     abortControllerRef.current = new AbortController()
 
-    if (workflow === 'v3') {
+    if (['v3', 'v4'].includes(workflow)) {
       startProgression()
     }
 
@@ -175,6 +266,7 @@ export const useSession = () => {
             cancelled: true,
             message: 'Riddle me not, I guess...',
           },
+          badgeTier: null,
         }))
         return
       }
@@ -186,6 +278,7 @@ export const useSession = () => {
         isLoading: false,
         finalResponse: data,
         currentAction: '',
+        badgeTier: null,
       }))
     } catch (error: unknown) {
       stopProgression()
@@ -199,6 +292,7 @@ export const useSession = () => {
             cancelled: true,
             message: 'Riddle me not, I guess...',
           },
+          badgeTier: null,
         }))
       } else {
         // More detailed error for mobile debugging
@@ -211,6 +305,7 @@ export const useSession = () => {
           ...prev,
           isLoading: false,
           error: detailedError,
+          badgeTier: null,
         }))
       }
     }
@@ -238,6 +333,8 @@ export const useSession = () => {
       finalResponse: null,
       error: null,
       isCancelling: false,
+      winningText: null,
+      badgeTier: null,
     })
 
     cancelledRef.current = false
