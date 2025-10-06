@@ -13,7 +13,10 @@ const CREATIVE_MODEL = '@cf/meta/llama-3.1-70b-instruct'
  * @param env - Environment variables containing model overrides
  * @returns Model string for AI.run
  */
-export function selectModel(taskType: 'classification' | 'creative', env?: CloudflareEnv): string {
+export function selectModel(
+  taskType: 'classification' | 'creative',
+  env?: CloudflareEnv
+): string {
   if (taskType === 'creative') {
     // Use powerful model for creative tasks like riddle generation
     return env?.AI_MODEL_CREATIVE || CREATIVE_MODEL
@@ -28,7 +31,9 @@ export function selectModel(taskType: 'classification' | 'creative', env?: Cloud
  * @param taskType - Type of task
  * @returns Recommended max_tokens value
  */
-export function getMaxTokensForTask(taskType: 'classification' | 'creative'): number {
+export function getMaxTokensForTask(
+  taskType: 'classification' | 'creative'
+): number {
   return taskType === 'creative' ? 512 : 256
 }
 
@@ -38,7 +43,10 @@ export function getMaxTokensForTask(taskType: 'classification' | 'creative'): nu
  * @param env - Environment variables
  * @returns AI options object with model and max_tokens
  */
-export function createAIOptions(taskType: 'classification' | 'creative', env?: CloudflareEnv) {
+export function createAIOptions(
+  taskType: 'classification' | 'creative',
+  env?: CloudflareEnv
+) {
   return {
     model: selectModel(taskType, env),
     max_tokens: getMaxTokensForTask(taskType),

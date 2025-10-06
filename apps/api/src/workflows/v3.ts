@@ -175,7 +175,7 @@ const WorkflowV3 = pipeline()
       const nextStep = needsSearch ? 'search-answer' : 'riddle-response'
 
       // Use LLM-generated action words when available, fallback to hard-coded ones
-      let actionWord = needsSearch
+      const actionWord = needsSearch
         ? 'searching knowledge'
         : getRandomActionWord(data.webRequest?.question || '')
 

@@ -29,6 +29,8 @@ interface ApiResponseData {
   riddles?: SingleRiddle[]
   riddleResponse?: ApiResponseData // V3 nested format
   cancelled?: boolean
+  badgeAwarded?: boolean
+  badgeTier?: 'silver' | 'gold'
 }
 
 interface ChatContainerProps {
@@ -110,11 +112,16 @@ const ChatContainer: React.FC<ChatContainerProps> = ({
     }, 50)
   }
 
-  const getResponseData = (response: ApiResponse): ApiResponseData | null => {
+  const getResponseData = (
+    response: Record<string, unknown>
+  ): ApiResponseData | null => {
     if (response.cancelled) return null
 
     // V3 format (nested) or V4 format (direct)
-    return response.riddleResponse || response
+    return (
+      (response.riddleResponse as ApiResponseData) ||
+      (response as unknown as ApiResponseData)
+    )
   }
 
   // Handle final response when session completes
