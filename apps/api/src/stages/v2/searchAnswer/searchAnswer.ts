@@ -100,13 +100,24 @@ const searchAnswerStage = async (
     try {
       const searchUrl = `https://www.googleapis.com/customsearch/v1?key=${input.env.GOOGLE_SEARCH_API_KEY}&cx=${input.env.GOOGLE_SEARCH_ENGINE_ID}&q=${encodeURIComponent(searchQuery)}&num=3`
 
+      console.log('Calling Google Search API...')
       const response = await fetch(searchUrl)
+      console.log('Google API response status:', response.status)
+
       const data = (await response.json()) as {
         items?: Array<{ title?: string; snippet?: string; link?: string }>
         error?: { code: number; message: string }
       }
 
-      if (data.items && data.items.length > 0) {
+      if (data.error) {
+        console.error(
+          'Google Search API error:',
+          data.error.code,
+          data.error.message
+        )
+        searchPerformed = false
+      } else if (data.items && data.items.length > 0) {
+        console.log('Search successful - found', data.items.length, 'results')
         searchResults = data.items.map((item) => ({
           title: item.title || '',
           snippet: item.snippet || '',
@@ -114,8 +125,12 @@ const searchAnswerStage = async (
         }))
         searchPerformed = true
         answerSource = 'search'
+      } else {
+        console.log('Search returned 0 results (no items in response)')
+        searchPerformed = false
       }
-    } catch {
+    } catch (error) {
+      console.error('Search fetch error:', error)
       searchPerformed = false
     }
   }
