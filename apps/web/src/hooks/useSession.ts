@@ -215,6 +215,9 @@ export const useSession = () => {
       return
     }
 
+    // Stop any existing progression timers first
+    stopProgression()
+
     // Reset state for API call
     setState({
       isLoading: true,

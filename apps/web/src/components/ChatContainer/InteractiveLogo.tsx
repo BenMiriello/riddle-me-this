@@ -37,6 +37,8 @@ const advancedRandomWords1 = [
   'Mistle',
   'Brittle',
   'Pistol',
+  'Squiggle',
+  'Prickle',
 ]
 
 const randomWords2 = ['You', 'Knee', 'Whee', 'We']
