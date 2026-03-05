@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { track } from '../utils/analytics'
 
 interface SessionState {
   isLoading: boolean
@@ -143,6 +144,12 @@ export const useSession = () => {
       startProgression()
     }
 
+    const startTime = Date.now()
+    track('riddle_submitted', {
+      question_length: question.length,
+      workflow,
+    })
+
     try {
       const apiUrl = `${import.meta.env.VITE_API_URL}/riddle`
       console.log('🔍 Making API request to:', apiUrl)
@@ -164,9 +171,11 @@ export const useSession = () => {
       }
 
       const data = await response.json()
+      const elapsed = Date.now() - startTime
 
       // Check if cancelled during request
       if (cancelledRef.current) {
+        track('riddle_cancelled', { waited_ms: elapsed })
         setState((prev) => ({
           ...prev,
           isLoading: false,
@@ -179,6 +188,12 @@ export const useSession = () => {
         return
       }
 
+      track('riddle_response', {
+        response_time_ms: elapsed,
+        has_riddles: data.riddles ? data.riddles.length : 0,
+        has_search_results: data.searchResults ? data.searchResults.length : 0,
+      })
+
       // Stop progression and show final result
       stopProgression()
       setState((prev) => ({
@@ -189,8 +204,10 @@ export const useSession = () => {
       }))
     } catch (error: unknown) {
       stopProgression()
+      const elapsed = Date.now() - startTime
 
       if (error instanceof Error && error.name === 'AbortError') {
+        track('riddle_cancelled', { waited_ms: elapsed })
         setState((prev) => ({
           ...prev,
           isLoading: false,
@@ -201,11 +218,12 @@ export const useSession = () => {
           },
         }))
       } else {
-        // More detailed error for mobile debugging
         const apiUrl = import.meta.env.VITE_API_URL
         const errorMsg =
           error instanceof Error ? error.message : 'Unknown error'
         const detailedError = `API Error: ${errorMsg}. URL: ${apiUrl}/riddle. Check network connection.`
+
+        track('riddle_error', { error: errorMsg, waited_ms: elapsed })
 
         setState((prev) => ({
           ...prev,
