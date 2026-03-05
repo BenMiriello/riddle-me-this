@@ -146,6 +146,7 @@ export const useSession = () => {
 
     const startTime = Date.now()
     track('riddle_submitted', {
+      question: question.slice(0, 500),
       question_length: question.length,
       workflow,
     })
@@ -188,10 +189,23 @@ export const useSession = () => {
         return
       }
 
+      // Extract response text and metadata for tracking
+      const responseData = data.riddleResponse || data
+      const responseText = responseData.finalResponse || ''
+      const responseType = responseData.responseType || 'unknown'
+      const badges = (responseData.badges || [])
+        .map((b: { type: string }) => b.type)
+        .join(',')
+      const searchPerformed = responseData.searchPerformed ? 1 : 0
+
       track('riddle_response', {
+        question: question.slice(0, 500),
+        response: responseText.slice(0, 500),
+        response_type: responseType,
+        badges,
+        search_performed: searchPerformed,
         response_time_ms: elapsed,
-        has_riddles: data.riddles ? data.riddles.length : 0,
-        has_search_results: data.searchResults ? data.searchResults.length : 0,
+        riddle_count: data.riddles ? data.riddles.length : 0,
       })
 
       // Stop progression and show final result
